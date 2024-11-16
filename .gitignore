@@ -129,9 +129,11 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-start-bot.vbs
+nite-init.vbs
 nodemon.json
 data/subscriptions.json
 data/bugs.json
 
 temp/*
+
+src/config/ecosystem.config.cjs
