@@ -1,0 +1,47 @@
+[
+  {
+    "userId": 5880729554,
+    "username": "lordaimer",
+    "userFirstName": "Arane",
+    "description": "Add the translated message inside /trns as a link so that the user can just copy it by clicking it",
+    "id": 1731728502722,
+    "status": "resolved",
+    "createdAt": "2024-11-16T03:41:42.722Z"
+  },
+  {
+    "userId": 5880729554,
+    "username": "lordaimer",
+    "userFirstName": "Arane",
+    "description": "use another api for the /jk command. Current one has very limited options. It keeps showing the same joke over and over again",
+    "id": 1731728570690,
+    "status": "pending",
+    "createdAt": "2024-11-16T03:42:50.690Z"
+  },
+  {
+    "userId": 5880729554,
+    "username": "lordaimer",
+    "userFirstName": "Arane",
+    "description": "add a system to track which jokes were shared with a user and do not show the joke that has been previously sent to the user.",
+    "id": 1731728654128,
+    "status": "pending",
+    "createdAt": "2024-11-16T03:44:14.128Z"
+  },
+  {
+    "userId": 5880729554,
+    "username": "lordaimer",
+    "userFirstName": "Arane",
+    "description": "translation undefined",
+    "id": 1731736417224,
+    "status": "pending",
+    "createdAt": "2024-11-16T05:53:37.224Z"
+  },
+  {
+    "userId": 5880729554,
+    "username": "lordaimer",
+    "userFirstName": "Arane",
+    "description": "sometimes the translation language selector menu is not showing",
+    "id": 1731736432414,
+    "status": "pending",
+    "createdAt": "2024-11-16T05:53:52.414Z"
+  }
+]
