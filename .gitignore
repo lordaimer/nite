@@ -129,13 +129,9 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
+# Project specific
 nite-init.vbs
 nodemon.json
-data/subscriptions.json
-data/bugs.json
-
-temp/*
-
 src/config/ecosystem.config.cjs
-
 src/services/data/subscriptions.json
+src/services/data/bugs.json
