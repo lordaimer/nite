@@ -5,7 +5,7 @@ import { rateLimitService } from '../../services/api/rateLimitService.js';
 const movieCache = new Map();
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
-// Store user selections in memory (moved outside the setup function)
+// Store user selections in memory
 const userSelections = new Map();
 
 // Genre list with emojis
@@ -42,29 +42,15 @@ const RATING_FILTERS = {
     '9+ Rating': 9
 };
 
-// Debug logger with log levels
-const debug = (message, data = null) => {
-    // Only log important operations and errors
-    const important = message.startsWith('Error') || 
-                     message.includes('command received') ||
-                     message.includes('movie recommendation') ||
-                     message.includes('API response');
-                     
-    if (important) {
-        const logMessage = `[DEBUG] ${message}${data ? ': ' + JSON.stringify(data, null, 2) : ''}`;
-        console.log(logMessage);
-    }
-};
+// TMDb API configuration
+const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/original';
+const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
 // Create initial keyboard with genre and rating buttons
 function createInitialKeyboard(chatId) {
-    debug('Creating initial keyboard for chat', { chatId });
     const selection = userSelections.get(chatId);
-    debug('Raw selection from map', selection);
     
-    // Make sure we have a valid selection object
     if (!selection) {
-        debug('No selection found for chat', { chatId });
         return {
             inline_keyboard: [
                 [
@@ -87,17 +73,13 @@ function createInitialKeyboard(chatId) {
         };
     }
 
-    // Format the genre text
-    let genreText = selection.genre ? 
+    const genreText = selection.genre ? 
         `🎭 Genre: ${selection.genre.charAt(0).toUpperCase() + selection.genre.slice(1)}` : 
         '🎭 Genre: Not Selected';
 
-    // Format the rating text
-    let ratingText = selection.rating ? 
+    const ratingText = selection.rating ? 
         `⭐ Rating: ${selection.rating}+` : 
         '⭐ Rating: Not Selected';
-    
-    debug('Creating keyboard with texts', { genreText, ratingText });
     
     return {
         inline_keyboard: [
@@ -123,12 +105,10 @@ function createInitialKeyboard(chatId) {
 
 // Create genre selection keyboard
 function createGenreKeyboard() {
-    debug('Creating genre keyboard');
     const keyboard = {
         inline_keyboard: []
     };
     
-    // Create rows of 2 buttons each
     const entries = Object.entries(GENRES);
     for (let i = 0; i < entries.length; i += 2) {
         const row = [];
@@ -142,24 +122,20 @@ function createGenreKeyboard() {
         keyboard.inline_keyboard.push(row);
     }
     
-    // Add back button
     keyboard.inline_keyboard.push([{
         text: '↩️ Back',
         callback_data: 'wtw_back_to_main'
     }]);
     
-    debug('Genre keyboard created', keyboard);
     return keyboard;
 }
 
 // Create rating selection keyboard
 function createRatingKeyboard() {
-    debug('Creating rating keyboard');
     const keyboard = {
         inline_keyboard: []
     };
 
-    // Add rating buttons
     Object.entries(RATING_FILTERS).forEach(([label, value]) => {
         keyboard.inline_keyboard.push([{
             text: label,
@@ -167,13 +143,11 @@ function createRatingKeyboard() {
         }]);
     });
     
-    // Add back button
     keyboard.inline_keyboard.push([{
         text: '↩️ Back',
         callback_data: 'wtw_back_to_main'
     }]);
     
-    debug('Rating keyboard created', keyboard);
     return keyboard;
 }
 
@@ -191,90 +165,134 @@ function createMovieResultKeyboard(imdbID, genre, rating) {
     };
 }
 
-async function discoverMovie(genre, minRating) {
+async function searchActorImdbId(actorName) {
     try {
-        debug('Discovering movie', { genre, minRating });
-        
-        // Handle random genre selection
-        let actualGenre = genre;
-        if (genre === 'random') {
-            const genres = Object.keys(genreMapping).filter(g => g !== 'random');
-            actualGenre = genres[Math.floor(Math.random() * genres.length)];
-            debug('Selected random genre', actualGenre);
-        }
-
-        // Map our genre to TMDB genre
-        const tmdbGenre = genreMapping[actualGenre];
-        if (!tmdbGenre && genre !== 'random') {
-            throw new Error(`Invalid genre: ${actualGenre}`);
-        }
-        debug('Mapped to TMDB genre', tmdbGenre);
-
-        const genreResponse = await axios.get(`https://api.themoviedb.org/3/genre/movie/list`, {
-            params: {
-                api_key: process.env.TMDB_API_KEY
-            }
-        });
-
-        const genreId = genreResponse.data.genres.find(g => g.name === tmdbGenre)?.id;
-        if (!genreId) throw new Error(`TMDB genre not found: ${tmdbGenre}`);
-        debug('Found genre ID', genreId);
-
-        // Discover movies from TMDB
-        const response = await axios.get(`https://api.themoviedb.org/3/discover/movie`, {
+        const response = await axios.get(`${TMDB_BASE_URL}/search/person`, {
             params: {
                 api_key: process.env.TMDB_API_KEY,
-                with_genres: genreId,
-                'vote_average.gte': minRating,
-                'vote_count.gte': 1000, // Ensure movie has enough votes
-                sort_by: 'vote_average.desc',
-                page: Math.floor(Math.random() * 5) + 1 // Random page between 1-5
+                query: actorName,
+                language: 'en-US'
             }
         });
-        debug('TMDB API response received', { totalResults: response.data.total_results });
 
-        if (!response.data.results || response.data.results.length === 0) {
-            throw new Error('No movies found matching criteria');
+        if (response.data.results && response.data.results.length > 0) {
+            const personId = response.data.results[0].id;
+            const personDetails = await axios.get(`${TMDB_BASE_URL}/person/${personId}/external_ids`, {
+                params: {
+                    api_key: process.env.TMDB_API_KEY
+                }
+            });
+            return personDetails.data.imdb_id;
         }
-
-        // Pick a random movie from the results
-        const movies = response.data.results;
-        const randomMovie = movies[Math.floor(Math.random() * movies.length)];
-        debug('Selected random movie', { title: randomMovie.title });
-
-        // Get additional movie details from OMDB
-        const omdbResponse = await axios.get(`http://www.omdbapi.com/`, {
-            params: {
-                apikey: process.env.OMDB_API_KEY,
-                t: randomMovie.title
-            }
-        });
-        debug('OMDB API response received');
-
-        return {
-            tmdb: randomMovie,
-            omdb: omdbResponse.data
-        };
+        return null;
     } catch (error) {
-        debug('Error in discoverMovie', error.message);
-        throw error;
+        return null;
     }
 }
 
-function formatMovieInfo(movie) {
-    // Create IMDb URL from movie ID
+async function discoverMovie(genre, minRating, maxRetries = 3) {
+    let lastError = null;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            const selectedGenre = genre.toLowerCase() === 'random' ? 
+                Object.keys(genreMapping)[Math.floor(Math.random() * (Object.keys(genreMapping).length - 1))] : 
+                genre.toLowerCase();
+
+            const genreName = genreMapping[selectedGenre];
+            const genreResponse = await axios.get(`${TMDB_BASE_URL}/genre/movie/list`, {
+                params: {
+                    api_key: process.env.TMDB_API_KEY,
+                    language: 'en-US'
+                }
+            });
+
+            const genreId = genreResponse.data.genres.find(g => g.name === genreName)?.id;
+            
+            const response = await axios.get(`${TMDB_BASE_URL}/discover/movie`, {
+                params: {
+                    api_key: process.env.TMDB_API_KEY,
+                    with_genres: genreId,
+                    'vote_average.gte': minRating,
+                    'vote_count.gte': 100,
+                    language: 'en-US',
+                    include_adult: false,
+                    page: Math.floor(Math.random() * 5) + 1
+                }
+            });
+
+            if (!response.data.results || response.data.results.length === 0) {
+                throw new Error('No movies found matching the criteria');
+            }
+
+            const movies = response.data.results;
+            const randomMovie = movies[Math.floor(Math.random() * movies.length)];
+
+            const omdbResponse = await axios.get(`http://www.omdbapi.com/`, {
+                params: {
+                    apikey: process.env.OMDB_API_KEY,
+                    t: randomMovie.title,
+                    y: new Date(randomMovie.release_date).getFullYear()
+                }
+            });
+
+            if (omdbResponse.data.Response === 'False') {
+                throw new Error('Movie details not found in OMDB');
+            }
+
+            return {
+                tmdb: randomMovie,
+                omdb: omdbResponse.data
+            };
+        } catch (error) {
+            lastError = error;
+            // If this is not our last attempt, continue to the next try
+            if (attempt < maxRetries - 1) {
+                continue;
+            }
+            throw new Error(`Failed to find movie after ${maxRetries} attempts: ${lastError.message}`);
+        }
+    }
+}
+
+async function formatMovieInfo(movie) {
     const imdbUrl = `https://www.imdb.com/title/${movie.tmdb.imdb_id}`;
     
-    // Format basic info with fancy unicode characters and HTML formatting
+    // Convert runtime from "X min" to "X hours Y mins"
+    let runtimeFormatted = 'N/A';
+    if (movie.omdb.Runtime && movie.omdb.Runtime !== 'N/A') {
+        const minutes = parseInt(movie.omdb.Runtime);
+        if (!isNaN(minutes)) {
+            const hours = Math.floor(minutes / 60);
+            const remainingMins = minutes % 60;
+            runtimeFormatted = hours > 0 
+                ? `${hours}h ${remainingMins}m`
+                : `${remainingMins}m`;
+        }
+    }
+
+    // Format actors with IMDb links
+    let formattedActors = 'N/A';
+    if (movie.omdb.Actors && movie.omdb.Actors !== 'N/A') {
+        const actors = movie.omdb.Actors.split(', ');
+        const actorPromises = actors.map(async actor => {
+            const imdbId = await searchActorImdbId(actor);
+            return imdbId ? 
+                `<a href="https://www.imdb.com/name/${imdbId}">${actor}</a>` : 
+                actor;
+        });
+        const linkedActors = await Promise.all(actorPromises);
+        formattedActors = linkedActors.join(', ');
+    }
+    
     const basicInfo = `📀 𝖳𝗂𝗍𝗅𝖾 : <a href="${imdbUrl}">${movie.tmdb.title}</a>
 
 🌟 𝖱𝖺𝗍𝗂𝗇𝗀 : ${movie.omdb.imdbRating || 'N/A'}/10
 📆 𝖱𝖾𝗅𝖾𝖺𝗌𝖾 : ${movie.omdb.Released || 'N/A'}
 🎭 𝖦𝖾𝗇𝗋𝖾 : ${movie.omdb.Genre || 'N/A'}
-⏱️ 𝖱𝗎𝗇𝗍𝗂𝗆𝖾 : ${movie.omdb.Runtime || 'N/A'}
+⏱️ 𝖱𝗎𝗇𝗍𝗂𝗆𝖾 : ${runtimeFormatted}
 🔊 𝖫𝖺𝗇𝗀𝗎𝖺𝗀𝖾 : ${movie.omdb.Language || 'N/A'}
 🎥 𝖣𝗂𝗋𝖾𝖼𝗍𝗈𝗋𝗌 : ${movie.omdb.Director || 'N/A'}
-🔆 𝖲𝗍𝖺𝗋𝗌 : ${movie.omdb.Actors || 'N/A'}
+🔆 𝖲𝗍𝖺𝗋𝗌 : ${formattedActors}
 
 🗒 𝖲𝗍𝗈𝗋𝗒𝗅𝗂𝗇𝖾 : <code>${movie.omdb.Plot || 'No plot available'}</code>`;
 
@@ -282,12 +300,9 @@ function formatMovieInfo(movie) {
 }
 
 export async function setupWhatToWatchCommand(bot, rateLimitService) {
-    debug('Setting up WhatToWatch command');
-
     // Command handler for /whattowatch and /wtw
     bot.onText(/^\/(?:whattowatch|wtw)$/, async (msg) => {
         const chatId = msg.chat.id;
-        debug('WhatToWatch command received', { chatId });
 
         try {
             // If rateLimitService is provided, check rate limit
@@ -305,7 +320,6 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
 
             // Initialize user selection
             userSelections.set(chatId, { genre: null, rating: null });
-            debug('Initialized selection', userSelections.get(chatId));
 
             // Create and send initial message with keyboard
             const text = '🎬 *What would you like to watch?*\nSelect your preferences to get a movie recommendation!';
@@ -315,9 +329,7 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
                 parse_mode: 'Markdown',
                 reply_markup: keyboard
             });
-            debug('Initial message sent', { messageId: sentMessage.message_id });
         } catch (error) {
-            debug('Error in command handler', error.message);
             await bot.sendMessage(
                 msg.chat.id,
                 '❌ Sorry, something went wrong. Please try again later.'
@@ -329,13 +341,10 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
     bot.on('callback_query', async (callbackQuery) => {
         try {
             const data = callbackQuery.data;
-            debug('Callback data received', data);
             if (!data.startsWith('wtw_')) return;
 
             const chatId = callbackQuery.message.chat.id;
             const messageId = callbackQuery.message.message_id;
-
-            debug('Processing callback for chat', { chatId, messageId });
 
             // If rateLimitService is provided, check rate limit
             if (rateLimitService && typeof rateLimitService.check === 'function') {
@@ -363,69 +372,49 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
                 params = parts.slice(2);
             }
 
-            debug('Parsed callback data', { prefix, action, params });
-            
             // Get or initialize user selections
             let selection = userSelections.get(chatId) || { genre: null, rating: null };
-            debug('Current user selection', selection);
 
             try {
                 let text, keyboard;
                 
                 // First handle the action
-                debug('Processing action', action);
                 switch(action) {
                     case 'select_genre':
-                        debug('Creating genre selection view');
                         text = '🎭 *Select a Genre:*\nChoose your preferred movie genre:';
                         keyboard = createGenreKeyboard();
                         break;
 
                     case 'select_rating':
-                        debug('Creating rating selection view');
                         text = '⭐ *Select Minimum IMDb Rating:*\nChoose the minimum rating for recommendations:';
                         keyboard = createRatingKeyboard();
                         break;
 
                     case 'genre':
                         const selectedGenre = params[0];
-                        debug('Genre selected', selectedGenre);
-                        
-                        // Get existing selection or create new one
                         selection = userSelections.get(chatId) || { genre: null, rating: null };
                         selection.genre = selectedGenre;
                         userSelections.set(chatId, selection);
-                        debug('Updated selection', userSelections.get(chatId));
-                        
                         text = '🎬 *What would you like to watch?*\nSelect your preferences to get a movie recommendation!';
                         keyboard = createInitialKeyboard(chatId);
-                        debug('Created keyboard with selection', userSelections.get(chatId));
                         break;
 
                     case 'rating':
                         const selectedRating = parseInt(params[0]);
-                        debug('Rating selected', selectedRating);
-                        
-                        // Get existing selection or create new one
                         selection = userSelections.get(chatId) || { genre: null, rating: null };
                         selection.rating = selectedRating;
                         userSelections.set(chatId, selection);
-                        debug('Updated selection', userSelections.get(chatId));
-                        
                         text = '🎬 *What would you like to watch?*\nSelect your preferences to get a movie recommendation!';
                         keyboard = createInitialKeyboard(chatId);
-                        debug('Created keyboard with selection', userSelections.get(chatId));
                         break;
 
                     case 'back_to_main':
-                        debug('Returning to main menu');
                         text = '🎬 *What would you like to watch?*\nSelect your preferences to get a movie recommendation!';
                         keyboard = createInitialKeyboard(chatId);
                         break;
 
                     case 'confirm':
                         if (!selection.genre || !selection.rating) {
-                            debug('Attempted confirmation without complete selection', selection);
                             await bot.answerCallbackQuery(callbackQuery.id, {
                                 text: '⚠️ Please select both genre and rating first!',
                                 show_alert: true
@@ -433,41 +422,70 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
                             return;
                         }
 
-                        debug('Getting movie recommendation for', selection);
-                        const movie = await discoverMovie(selection.genre, selection.rating);
-                        if (movie.tmdb.poster_path && movie.tmdb.poster_path !== 'N/A') {
-                            await bot.sendPhoto(chatId, `https://image.tmdb.org/t/p/w500${movie.tmdb.poster_path}`, {
-                                caption: formatMovieInfo(movie),
-                                parse_mode: 'HTML',
-                                reply_markup: createMovieResultKeyboard(movie.tmdb.imdb_id, selection.genre, selection.rating)
+                        // Show loading state immediately
+                        await bot.answerCallbackQuery(callbackQuery.id, {
+                            text: '🎬 Finding a movie for you...',
+                            show_alert: false
+                        });
+
+                        try {
+                            const movie = await discoverMovie(selection.genre, selection.rating);
+                            if (movie.tmdb.poster_path && movie.tmdb.poster_path !== 'N/A') {
+                                await bot.sendPhoto(chatId, `${TMDB_IMAGE_BASE}${movie.tmdb.poster_path}`, {
+                                    caption: await formatMovieInfo(movie),
+                                    parse_mode: 'HTML',
+                                    reply_markup: createMovieResultKeyboard(movie.tmdb.imdb_id, selection.genre, selection.rating)
+                                });
+                                await bot.deleteMessage(chatId, messageId);
+                            } else {
+                                text = await formatMovieInfo(movie);
+                                keyboard = createMovieResultKeyboard(movie.tmdb.imdb_id, selection.genre, selection.rating);
+                            }
+                        } catch (error) {
+                            // If error occurs, show error message but keep the current movie and button
+                            await bot.answerCallbackQuery(callbackQuery.id, {
+                                text: '❌ Failed to find a movie. Please try again.',
+                                show_alert: true
                             });
-                            await bot.deleteMessage(chatId, messageId);
-                            return; // Skip the message edit since we're sending a new message
-                        } else {
-                            text = formatMovieInfo(movie);
-                            keyboard = createMovieResultKeyboard(movie.tmdb.imdb_id, selection.genre, selection.rating);
                         }
-                        break;
+                        return;
 
                     case 'another':
-                        debug('Getting another recommendation');
-                        const newMovie = await discoverMovie(params[0], params[1]);
-                        if (newMovie.tmdb.poster_path && newMovie.tmdb.poster_path !== 'N/A') {
-                            await bot.sendPhoto(chatId, `https://image.tmdb.org/t/p/w500${newMovie.tmdb.poster_path}`, {
-                                caption: formatMovieInfo(newMovie),
-                                parse_mode: 'HTML',
-                                reply_markup: createMovieResultKeyboard(newMovie.tmdb.imdb_id, params[0], params[1])
+                        // Show loading state immediately
+                        await bot.answerCallbackQuery(callbackQuery.id, {
+                            text: '🎬 Finding another movie for you...',
+                            show_alert: false
+                        });
+
+                        try {
+                            const newMovie = await discoverMovie(params[0], params[1]);
+                            if (newMovie.tmdb.poster_path && newMovie.tmdb.poster_path !== 'N/A') {
+                                await bot.sendPhoto(chatId, `${TMDB_IMAGE_BASE}${newMovie.tmdb.poster_path}`, {
+                                    caption: await formatMovieInfo(newMovie),
+                                    parse_mode: 'HTML',
+                                    reply_markup: createMovieResultKeyboard(newMovie.tmdb.imdb_id, params[0], params[1])
+                                });
+                                await bot.deleteMessage(chatId, messageId);
+                            } else {
+                                const text = await formatMovieInfo(newMovie);
+                                const keyboard = createMovieResultKeyboard(newMovie.tmdb.imdb_id, params[0], params[1]);
+                                await bot.editMessageText(text, {
+                                    chat_id: chatId,
+                                    message_id: messageId,
+                                    parse_mode: 'HTML',
+                                    reply_markup: keyboard
+                                });
+                            }
+                        } catch (error) {
+                            // If error occurs, show error message but keep the current movie and button
+                            await bot.answerCallbackQuery(callbackQuery.id, {
+                                text: '❌ Failed to find another movie. Please try again.',
+                                show_alert: true
                             });
-                            await bot.deleteMessage(chatId, messageId);
-                            return; // Skip the message edit since we're sending a new message
-                        } else {
-                            text = formatMovieInfo(newMovie);
-                            keyboard = createMovieResultKeyboard(newMovie.tmdb.imdb_id, params[0], params[1]);
                         }
-                        break;
+                        return;
 
                     default:
-                        debug('Unknown action', action);
                         await bot.answerCallbackQuery(callbackQuery.id, {
                             text: '❌ Invalid action',
                             show_alert: true
@@ -477,44 +495,36 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
 
                 // If we have text and keyboard, update the message
                 if (text && keyboard) {
-                    debug('Preparing to edit message');
-                    debug('Text', text);
-                    debug('Keyboard', keyboard);
-                    
-                    try {
-                        const result = await bot.editMessageText(text, {
-                            chat_id: chatId,
-                            message_id: messageId,
-                            parse_mode: 'HTML',
-                            reply_markup: keyboard
-                        });
-                        debug('Message edit result', result);
-                    } catch (editError) {
-                        debug('Failed to edit message', editError);
-                        if (editError.response && editError.response.body) {
-                            debug('Telegram error', editError.response.body);
-                        }
-                        throw editError;
-                    }
+                    const result = await bot.editMessageText(text, {
+                        chat_id: chatId,
+                        message_id: messageId,
+                        parse_mode: 'HTML',
+                        reply_markup: keyboard
+                    });
                 } else {
-                    debug('No text or keyboard to update');
+                    // No text or keyboard to update
                 }
 
                 // Answer the callback query to remove the loading state
                 await bot.answerCallbackQuery(callbackQuery.id);
             } catch (editError) {
-                debug('Error in switch statement', editError);
-                throw editError;
+                try {
+                    await bot.answerCallbackQuery(callbackQuery.id, {
+                        text: '❌ Sorry, something went wrong. Please try again.',
+                        show_alert: true
+                    });
+                } catch (callbackError) {
+                    // Error sending callback answer
+                }
             }
         } catch (error) {
-            debug('Error in callback query', error);
             try {
                 await bot.answerCallbackQuery(callbackQuery.id, {
                     text: '❌ Sorry, something went wrong. Please try again.',
                     show_alert: true
                 });
             } catch (callbackError) {
-                debug('Error sending callback answer', callbackError);
+                // Error sending callback answer
             }
         }
     });
