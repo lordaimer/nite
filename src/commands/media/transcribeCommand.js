@@ -72,7 +72,7 @@ export function setupTranscribeCommand(bot) {
     transcribeModeUsers.clear();
 
     // Handle /transcribe command with start anchor and exact match
-    bot.onText(/^\/(?:transcribe|trcb)$/, async (msg) => {
+    bot.onText(/^(\/transcribe|\/trcb)$/, async (msg) => {
         const chatId = msg.chat.id;
         
         // Check if user is already in transcribe mode

@@ -131,6 +131,64 @@ export function setupTranslateCommand(bot) {
     // Track users in translation mode
     const translateModeUsers = new Map();
 
+    // Handle /translate, /trans, or /trns command with exact matching
+    bot.onText(/^\/(?:translate|trans|trns)$/, async (msg) => {
+        const chatId = msg.chat.id;
+        
+        // Show help message and quick access keyboard
+        await bot.sendMessage(
+            chatId,
+            `*Translation Help*
+            
+To translate text, use one of these formats:
+/translate [language] [text]
+/trans [language] [text]
+/trns [language] [text]
+
+Examples:
+/translate es Hello world
+/trans spanish How are you?
+/trns japanese Good morning`,
+            {
+                parse_mode: 'Markdown',
+                reply_markup: getQuickAccessKeyboard()
+            }
+        );
+    });
+
+    // Handle translation with parameters
+    bot.onText(/^\/(?:translate|trans|trns)\s+([^]+?)\s+(.+)$/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        const targetLangInput = match[1]?.trim();
+        const text = match[2]?.trim();
+
+        // Normalize the language input
+        const normalizedLangCode = normalizeLanguageCode(targetLangInput);
+
+        // If we have text but no valid language code, show language selection menu
+        if ((!targetLangInput || !normalizedLangCode) && text) {
+            await showLanguageSelectionMenu(chatId, text);
+            return;
+        }
+
+        // Direct translation with valid language parameter
+        if (normalizedLangCode && text) {
+            try {
+                const result = await translateWithFallback(text, normalizedLangCode);
+                await bot.sendMessage(
+                    chatId,
+                    `*Original*: ${text}\n\n*Translation*: \`${result.translated}\``,
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: getTranslateAnotherKeyboard()
+                    }
+                );
+            } catch (error) {
+                await showLanguageSelectionMenu(chatId, text);
+            }
+        }
+    });
+
     // When language parameter is invalid or not provided, show quick language selection
     const showLanguageSelectionMenu = async (chatId, text) => {
         // Store the text to translate
@@ -180,49 +238,6 @@ Examples: Korean, Arabic, Portuguese, Vietnamese, etc.`,
             }
         );
     };
-
-    // Handle /translate or /trns command
-    bot.onText(/^\/(?:translate|trns|trans)(?:\s+([^]+?)\s+)?(.+)?$/, async (msg, match) => {
-        const chatId = msg.chat.id;
-        const targetLangInput = match[1]?.trim();
-        const text = match[2]?.trim();
-
-        // Help message if no parameters
-        if (!targetLangInput && !text) {
-            await bot.sendMessage(
-                chatId,
-                `*Nite Live Translate*\n\n...`,
-                { parse_mode: 'Markdown' }
-            );
-            return;
-        }
-
-        // Normalize the language input
-        const normalizedLangCode = normalizeLanguageCode(targetLangInput);
-
-        // If we have text but no valid language code, show language selection menu
-        if ((!targetLangInput || !normalizedLangCode) && text) {
-            await showLanguageSelectionMenu(chatId, text);
-            return;
-        }
-
-        // Direct translation with valid language parameter
-        if (normalizedLangCode && text) {
-            try {
-                const result = await translateWithFallback(text, normalizedLangCode);
-                await bot.sendMessage(
-                    chatId,
-                    `*Original*: ${text}\n\n*Translation*: \`${result.translated}\``,
-                    {
-                        parse_mode: 'Markdown',
-                        reply_markup: getTranslateAnotherKeyboard()
-                    }
-                );
-            } catch (error) {
-                await showLanguageSelectionMenu(chatId, text);
-            }
-        }
-    });
 
     // Handle custom language input
     bot.on('message', async (msg) => {
