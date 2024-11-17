@@ -3,36 +3,83 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { EventEmitter } from 'events';
+import moment from 'moment-timezone';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, '../data');
 const STORAGE_PATH = path.join(DATA_DIR, 'subscriptions.json');
+const BUGS_PATH = path.join(DATA_DIR, 'bugs.json');
 const subscriptionEmitter = new EventEmitter();
 let subscriptionsMap = new Map();
+let botInstance = null;
 
 class StorageService {
     constructor() {
         this.dataPath = DATA_DIR;
-        this.bugsFile = path.join(this.dataPath, 'bugs.json');
+        this.bugsFile = BUGS_PATH;
         this.initializeStorage();
+        this.setupSubscriptionListener();
+    }
+
+    setupSubscriptionListener() {
+        subscriptionEmitter.removeAllListeners('subscriptionChange');
+        
+        subscriptionEmitter.on('subscriptionChange', async (chatId, subscriptionData) => {
+            if (!botInstance || !subscriptionData) return;
+            
+            for (const [type, data] of Object.entries(subscriptionData)) {
+                if (data.times && data.times.length > 0) {
+                    const timesStr = data.times.map(time => 
+                        moment(time, 'HH:mm').format('h:mm A')
+                    ).join(', ');
+                    
+                    try {
+                        await botInstance.sendMessage(
+                            chatId,
+                            `✅ Successfully updated ${type} subscription times: ${timesStr}`,
+                            { parse_mode: 'Markdown' }
+                        );
+                    } catch (error) {
+                        console.error('Error sending subscription confirmation:', error);
+                    }
+                }
+            }
+        });
+    }
+
+    setBotInstance(bot) {
+        botInstance = bot;
     }
 
     initializeStorage() {
-        // Create data directory if it doesn't exist
         if (!fs.existsSync(this.dataPath)) {
             fs.mkdirSync(this.dataPath, { recursive: true });
         }
 
-        // Initialize bugs file
         if (!fs.existsSync(this.bugsFile)) {
             fs.writeFileSync(this.bugsFile, JSON.stringify([]));
         }
 
-        // Initialize subscriptions
         if (!fs.existsSync(STORAGE_PATH)) {
             fs.writeFileSync(STORAGE_PATH, JSON.stringify({}), 'utf8');
-        } else {
-            this.loadSubscriptions();
+        }
+        
+        this.loadSubscriptions();
+
+        const oldPath = path.join(__dirname, '../../commands/data/subscriptions.json');
+        if (fs.existsSync(oldPath)) {
+            try {
+                const oldData = JSON.parse(fs.readFileSync(oldPath, 'utf8'));
+                const currentData = Object.fromEntries(subscriptionsMap);
+                const mergedData = { ...oldData, ...currentData };
+                
+                fs.writeFileSync(STORAGE_PATH, JSON.stringify(mergedData, null, 2), 'utf8');
+                subscriptionsMap = new Map(Object.entries(mergedData));
+                
+                fs.unlinkSync(oldPath);
+            } catch (error) {
+                console.error('Error migrating old subscriptions:', error);
+            }
         }
     }
 
@@ -146,10 +193,41 @@ class StorageService {
         }
     }
 
+    areSubscriptionsEqual(sub1, sub2) {
+        if (!sub1 || !sub2) return sub1 === sub2;
+        
+        const types = new Set([...Object.keys(sub1), ...Object.keys(sub2)]);
+        
+        for (const type of types) {
+            const sub1Data = sub1[type];
+            const sub2Data = sub2[type];
+            
+            if (!sub1Data || !sub2Data) return false;
+            
+            if (sub1Data.timezone !== sub2Data.timezone) return false;
+            
+            const times1 = new Set(sub1Data.times || []);
+            const times2 = new Set(sub2Data.times || []);
+            
+            if (times1.size !== times2.size) return false;
+            
+            for (const time of times1) {
+                if (!times2.has(time)) return false;
+            }
+        }
+        
+        return true;
+    }
+
     updateSubscription(chatId, subscriptionData) {
-        subscriptionsMap.set(chatId.toString(), subscriptionData);
-        this.saveSubscriptions(subscriptionsMap);
-        subscriptionEmitter.emit('subscriptionChange', chatId, subscriptionData);
+        const chatIdStr = chatId.toString();
+        const currentData = subscriptionsMap.get(chatIdStr);
+        
+        if (!currentData || !this.areSubscriptionsEqual(currentData, subscriptionData)) {
+            subscriptionsMap.set(chatIdStr, subscriptionData);
+            this.saveSubscriptions(subscriptionsMap);
+            subscriptionEmitter.emit('subscriptionChange', chatId, subscriptionData);
+        }
     }
 
     removeSubscription(chatId) {

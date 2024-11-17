@@ -9,16 +9,21 @@ const VALID_COMMANDS = {
     quote: ['quote', 'quotes', '/quote', '/quotes', '/qt']
 };
 
+// Track recently processed commands to prevent duplicates on restart
+const recentCommands = new Map();
+const COMMAND_EXPIRY = 5000; // 5 seconds
+
 export function setupSubscribeCommand(bot) {
+    // Set bot instance in storage service
+    storageService.setBotInstance(bot);
+
     // Helper function to parse time strings
     function parseTime(timeStr) {
-        // Try parsing 24h format
         const time24 = moment(timeStr, 'HH:mm', true);
         if (time24.isValid()) {
             return time24.format('HH:mm');
         }
 
-        // Try parsing 12h format
         const time12 = moment(timeStr, ['h:mm a', 'ha', 'h a'], true);
         if (time12.isValid()) {
             return time12.format('HH:mm');
@@ -29,11 +34,32 @@ export function setupSubscribeCommand(bot) {
 
     // Helper function to check if time already exists in subscription
     function hasExistingTime(subscription, newTime) {
-        return subscription?.times.includes(newTime);
+        if (!subscription || !subscription.times) {
+            return false;
+        }
+        return subscription.times.includes(newTime);
     }
 
     bot.onText(/^\/(?:subscribe|sub)(?:\s+(.+))?$/, async (msg, match) => {
         const chatId = msg.chat.id;
+        const messageId = msg.message_id;
+        const commandKey = `${chatId}_${messageId}`;
+
+        // Check if this command was recently processed
+        const now = Date.now();
+        const lastProcessed = recentCommands.get(commandKey);
+        if (lastProcessed && (now - lastProcessed) < COMMAND_EXPIRY) {
+            return;
+        }
+        recentCommands.set(commandKey, now);
+
+        // Clean up old commands
+        for (const [key, timestamp] of recentCommands.entries()) {
+            if (now - timestamp > COMMAND_EXPIRY) {
+                recentCommands.delete(key);
+            }
+        }
+
         const args = match[1] ? match[1].toLowerCase().split(/[\s,]+/) : [];
 
         if (!match[1]) {
@@ -85,42 +111,47 @@ export function setupSubscribeCommand(bot) {
         // Parse times
         const timeArgs = args.slice(1);
         const validTimes = [];
+        const invalidTimes = [];
         const existingTimes = [];
 
         // Get current subscriptions
         const userSubs = storageService.getSubscriptions().get(chatId.toString()) || {};
-        
+
         for (const timeArg of timeArgs) {
             const parsedTime = parseTime(timeArg);
-            if (parsedTime) {
-                // Check if this time already exists in user's subscription
-                if (hasExistingTime(userSubs[subscriptionType], parsedTime)) {
-                    existingTimes.push(parsedTime);
-                } else {
-                    validTimes.push(parsedTime);
-                }
+            if (!parsedTime) {
+                invalidTimes.push(timeArg);
+                continue;
+            }
+            
+            if (hasExistingTime(userSubs[subscriptionType], parsedTime)) {
+                existingTimes.push(parsedTime);
+            } else {
+                validTimes.push(parsedTime);
             }
         }
 
-        // If all times already exist, notify user and exit
+        // Handle invalid times
+        if (invalidTimes.length > 0) {
+            await bot.sendMessage(
+                chatId,
+                'Please provide valid times in 24h format (HH:mm) or 12h format (e.g., 8pm).'
+            );
+            return;
+        }
+
+        // Handle case where all times exist
         if (validTimes.length === 0) {
             if (existingTimes.length > 0) {
-                const timesStr = existingTimes.map(time => {
-                    const [hours, minutes] = time.split(':');
-                    return moment(time, 'HH:mm').format('h:mm A');
-                }).join(', ');
+                const timesStr = existingTimes.map(time => 
+                    moment(time, 'HH:mm').format('h:mm A')
+                ).join(', ');
                 
                 await bot.sendMessage(
                     chatId,
                     `You already have ${subscriptionType} subscriptions at: ${timesStr}`
                 );
-                return;
             }
-
-            await bot.sendMessage(
-                chatId,
-                'Please provide valid times in 24h format (HH:mm) or 12h format (e.g., 8pm).'
-            );
             return;
         }
 
@@ -136,39 +167,13 @@ export function setupSubscribeCommand(bot) {
                 timezone: timezone
             };
         } else {
-            userSubs[subscriptionType].times = [
-                ...userSubs[subscriptionType].times,
-                ...validTimes
-            ].sort(); // Sort times for consistent display
+            const uniqueTimes = new Set([...userSubs[subscriptionType].times]);
+            validTimes.forEach(time => uniqueTimes.add(time));
+            userSubs[subscriptionType].times = Array.from(uniqueTimes).sort();
         }
 
-        // Save to storage
+        // Save to storage - success message will be sent by the change listener
         storageService.updateSubscription(chatId, userSubs);
-
-        // Format times for display
-        const newTimesStr = validTimes.map(time => {
-            return moment(time, 'HH:mm').format('h:mm A');
-        }).join(', ');
-
-        // Send success message for new subscriptions only
-        await bot.sendMessage(
-            chatId,
-            `✅ Successfully subscribed to ${subscriptionType}s at: ${newTimesStr}`,
-            { parse_mode: 'Markdown' }
-        );
-
-        // If there were any existing times, mention them in a separate message
-        if (existingTimes.length > 0) {
-            const existingTimesStr = existingTimes.map(time => {
-                const [hours, minutes] = time.split(':');
-                return moment(time, 'HH:mm').format('h:mm A');
-            }).join(', ');
-            
-            await bot.sendMessage(
-                chatId,
-                `Note: You already had ${subscriptionType} subscriptions at: ${existingTimesStr}`
-            );
-        }
     });
 
     // Handle unsubscribe command
