@@ -5,7 +5,8 @@ import { storageService } from '../../services/api/storageService.js';
 const VALID_COMMANDS = {
     fact: ['fact', 'facts', '/fact', '/facts', '/ft'],
     joke: ['joke', 'jokes', '/joke', '/jokes', '/jk'],
-    meme: ['meme', 'memes', '/meme', '/memes', '/mm']
+    meme: ['meme', 'memes', '/meme', '/memes', '/mm'],
+    quote: ['quote', 'quotes', '/quote', '/quotes', '/qt']
 };
 
 export function setupSubscribeCommand(bot) {
@@ -44,7 +45,8 @@ export function setupSubscribeCommand(bot) {
                 'Available content types:\n' +
                 '• facts, fact, /facts, /ft\n' +
                 '• jokes, joke, /jokes, /jk\n' +
-                '• memes, meme, /memes, /mm',
+                '• memes, meme, /memes, /mm\n' +
+                '• quotes, quote, /quotes, /qt',
                 { parse_mode: 'Markdown' }
             );
             return;
@@ -75,7 +77,7 @@ export function setupSubscribeCommand(bot) {
         if (!subscriptionType) {
             await bot.sendMessage(
                 chatId,
-                'Invalid subscription type. Please use fact, joke, or meme.'
+                'Invalid subscription type. Please use fact, joke, meme, or quote.'
             );
             return;
         }
@@ -100,7 +102,7 @@ export function setupSubscribeCommand(bot) {
             }
         }
 
-        // If all times already exist, notify user
+        // If all times already exist, notify user and exit
         if (validTimes.length === 0) {
             if (existingTimes.length > 0) {
                 const timesStr = existingTimes.map(time => {
@@ -149,6 +151,7 @@ export function setupSubscribeCommand(bot) {
             return moment(time, 'HH:mm').format('h:mm A');
         }).join(', ');
 
+        // Only send the success message for new subscriptions
         await bot.sendMessage(
             chatId,
             `✅ Added ${subscriptionType} subscription${validTimes.length > 1 ? 's' : ''} at: ${newTimesStr}`,
@@ -160,6 +163,19 @@ export function setupSubscribeCommand(bot) {
                 }
             }
         );
+
+        // If there were any existing times, mention them in a separate message
+        if (existingTimes.length > 0) {
+            const existingTimesStr = existingTimes.map(time => {
+                const [hours, minutes] = time.split(':');
+                return moment(time, 'HH:mm').format('h:mm A');
+            }).join(', ');
+            
+            await bot.sendMessage(
+                chatId,
+                `Note: You already had ${subscriptionType} subscriptions at: ${existingTimesStr}`
+            );
+        }
     });
 
     // Handle unsubscribe command

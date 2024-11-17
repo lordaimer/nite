@@ -3,6 +3,7 @@ import { rateLimitMiddleware } from '../../middleware/rateLimit.js';
 import { getFact } from '../../commands/utility/factCommand.js';
 import { fetchJoke } from '../../commands/utility/jokeCommand.js';
 import { getMemeFromReddit } from '../../commands/media/memeCommand.js';
+import { sendQuote } from '../../commands/utility/quoteCommand.js';
 
 const scheduledTasks = new Map();
 
@@ -70,6 +71,9 @@ async function executeScheduledTask(bot, chatId, command) {
                 break;
             case 'meme':
                 await getMemeFromReddit(bot, { chat: { id: chatId } });
+                break;
+            case 'quote':
+                await sendQuote(bot, chatId);
                 break;
             default:
                 await bot.sendMessage(chatId, 'Unknown command');

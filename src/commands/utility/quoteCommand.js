@@ -81,34 +81,38 @@ async function fetchAuthorImage(authorName) {
     }
 }
 
+// Export the quote functionality for use in subscriptions
+export async function sendQuote(bot, chatId) {
+    try {
+        await bot.sendChatAction(chatId, 'typing');
+        
+        const quote = await fetchQuote();
+        const formattedQuote = `*${quote.text}*\n${quote.author ? `— *${quote.author}*` : ''}`;
+        
+        // Only fetch image if we have a valid author
+        const authorImage = quote.author ? await fetchAuthorImage(quote.author) : null;
+        
+        if (authorImage) {
+            // Send image with quote as caption
+            await bot.sendPhoto(chatId, authorImage, {
+                caption: formattedQuote,
+                parse_mode: 'Markdown'
+            });
+        } else {
+            // Send text-only quote
+            await bot.sendMessage(chatId, formattedQuote, {
+                parse_mode: 'Markdown'
+            });
+        }
+    } catch (error) {
+        console.error('Error sending quote:', error);
+        await bot.sendMessage(chatId, '😔 Having trouble fetching quotes at the moment. Please try again later.');
+    }
+}
+
 export function setupQuoteCommand(bot) {
     bot.onText(/\/(quote|qt)/, async (msg) => {
         const chatId = msg.chat.id;
-
-        try {
-            await bot.sendChatAction(chatId, 'typing');
-
-            const quote = await fetchQuote();
-            const formattedQuote = `*${quote.text}*\n${quote.author ? `— *${quote.author}*` : ''}`;
-
-            // Only fetch image if we have a valid author
-            const authorImage = quote.author ? await fetchAuthorImage(quote.author) : null;
-
-            if (authorImage) {
-                // Send image with quote as caption
-                await bot.sendPhoto(chatId, authorImage, {
-                    caption: formattedQuote,
-                    parse_mode: 'Markdown'
-                });
-            } else {
-                // Send text-only quote
-                await bot.sendMessage(chatId, formattedQuote, {
-                    parse_mode: 'Markdown'
-                });
-            }
-        } catch (error) {
-            console.error('Error in quote command:', error);
-            await bot.sendMessage(chatId, '😔 Having trouble fetching quotes at the moment. Please try again later.');
-        }
+        await sendQuote(bot, chatId);
     });
 }
