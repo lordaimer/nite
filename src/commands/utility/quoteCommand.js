@@ -36,6 +36,11 @@ async function fetchQuote() {
 }
 
 async function fetchAuthorImage(authorName) {
+    // Skip image fetch for undefined, unknown or empty authors
+    if (!authorName || authorName.toLowerCase().includes('unknown') || authorName.trim() === '') {
+        return null;
+    }
+
     try {
         // Try Wikimedia API first
         const wikiQuery = encodeURIComponent(`${authorName}`);
@@ -84,9 +89,10 @@ export function setupQuoteCommand(bot) {
             await bot.sendChatAction(chatId, 'typing');
 
             const quote = await fetchQuote();
-            const formattedQuote = `*${quote.text}*\n— *${quote.author}*`;
+            const formattedQuote = `*${quote.text}*\n${quote.author ? `— *${quote.author}*` : ''}`;
 
-            const authorImage = await fetchAuthorImage(quote.author);
+            // Only fetch image if we have a valid author
+            const authorImage = quote.author ? await fetchAuthorImage(quote.author) : null;
 
             if (authorImage) {
                 // Send image with quote as caption
@@ -95,7 +101,7 @@ export function setupQuoteCommand(bot) {
                     parse_mode: 'Markdown'
                 });
             } else {
-                // Fallback to text-only quote if no image is found
+                // Send text-only quote
                 await bot.sendMessage(chatId, formattedQuote, {
                     parse_mode: 'Markdown'
                 });
