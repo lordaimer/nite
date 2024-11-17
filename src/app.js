@@ -20,7 +20,8 @@ import {
     setupSubscribeCommand,
     setupTranslateCommand,
     setupBugCommand,
-    setupQuoteCommand
+    setupQuoteCommand,
+    setupTruthOrDareCommand
 } from './commands/index.js';
 
 // Import services
@@ -204,7 +205,8 @@ function setupCommandsWithRateLimits() {
         { setup: setupTranslateCommand, name: 'translate' },
         { setup: setupQuoteCommand, name: 'quote' },
         { setup: setupBugCommand, name: 'bug' },
-        { setup: setupDownloadCommand, name: 'download' }
+        { setup: setupDownloadCommand, name: 'download' },
+        { setup: setupTruthOrDareCommand, name: 'truthordare' }
     ];
 
     commands.forEach(({ setup, name }) => {
