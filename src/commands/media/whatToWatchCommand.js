@@ -183,12 +183,6 @@ function createMovieResultKeyboard(imdbID, genre, rating) {
         inline_keyboard: [
             [
                 {
-                    text: '🎬 View on IMDb',
-                    url: `https://www.imdb.com/title/${imdbID}`
-                }
-            ],
-            [
-                {
                     text: '🎲 Try Another',
                     callback_data: `wtw_another_${genre}_${rating}`
                 }
@@ -268,17 +262,23 @@ async function discoverMovie(genre, minRating) {
 }
 
 function formatMovieInfo(movie) {
-    const imdbRating = movie.omdb.imdbRating !== 'N/A' ? `⭐ ${movie.omdb.imdbRating}/10` : 'Rating N/A';
-    const runtime = movie.omdb.Runtime !== 'N/A' ? `⏱️ ${movie.omdb.Runtime}` : '';
-    const year = movie.omdb.Year !== 'N/A' ? `📅 ${movie.omdb.Year}` : '';
-    const genre = movie.omdb.Genre !== 'N/A' ? `🎭 ${movie.omdb.Genre}` : '';
+    // Create IMDb URL from movie ID
+    const imdbUrl = `https://www.imdb.com/title/${movie.tmdb.imdb_id}`;
     
-    return `🎬 *${movie.tmdb.title}*\n\n` +
-           `${[imdbRating, runtime, year].filter(Boolean).join(' | ')}\n` +
-           `${genre}\n\n` +
-           `${movie.omdb.Plot}\n\n` +
-           `🎭 *Cast:* ${movie.omdb.Actors}\n` +
-           `🎪 *Director:* ${movie.omdb.Director}`;
+    // Format basic info with fancy unicode characters and HTML formatting
+    const basicInfo = `📀 𝖳𝗂𝗍𝗅𝖾 : <a href="${imdbUrl}">${movie.tmdb.title}</a>
+
+🌟 𝖱𝖺𝗍𝗂𝗇𝗀 : ${movie.omdb.imdbRating || 'N/A'}/10
+📆 𝖱𝖾𝗅𝖾𝖺𝗌𝖾 : ${movie.omdb.Released || 'N/A'}
+🎭 𝖦𝖾𝗇𝗋𝖾 : ${movie.omdb.Genre || 'N/A'}
+⏱️ 𝖱𝗎𝗇𝗍𝗂𝗆𝖾 : ${movie.omdb.Runtime || 'N/A'}
+🔊 𝖫𝖺𝗇𝗀𝗎𝖺𝗀𝖾 : ${movie.omdb.Language || 'N/A'}
+🎥 𝖣𝗂𝗋𝖾𝖼𝗍𝗈𝗋𝗌 : ${movie.omdb.Director || 'N/A'}
+🔆 𝖲𝗍𝖺𝗋𝗌 : ${movie.omdb.Actors || 'N/A'}
+
+🗒 𝖲𝗍𝗈𝗋𝗒𝗅𝗂𝗇𝖾 : <code>${movie.omdb.Plot || 'No plot available'}</code>`;
+
+    return basicInfo;
 }
 
 export async function setupWhatToWatchCommand(bot, rateLimitService) {
@@ -438,7 +438,7 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
                         if (movie.tmdb.poster_path && movie.tmdb.poster_path !== 'N/A') {
                             await bot.sendPhoto(chatId, `https://image.tmdb.org/t/p/w500${movie.tmdb.poster_path}`, {
                                 caption: formatMovieInfo(movie),
-                                parse_mode: 'Markdown',
+                                parse_mode: 'HTML',
                                 reply_markup: createMovieResultKeyboard(movie.tmdb.imdb_id, selection.genre, selection.rating)
                             });
                             await bot.deleteMessage(chatId, messageId);
@@ -455,7 +455,7 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
                         if (newMovie.tmdb.poster_path && newMovie.tmdb.poster_path !== 'N/A') {
                             await bot.sendPhoto(chatId, `https://image.tmdb.org/t/p/w500${newMovie.tmdb.poster_path}`, {
                                 caption: formatMovieInfo(newMovie),
-                                parse_mode: 'Markdown',
+                                parse_mode: 'HTML',
                                 reply_markup: createMovieResultKeyboard(newMovie.tmdb.imdb_id, params[0], params[1])
                             });
                             await bot.deleteMessage(chatId, messageId);
@@ -485,7 +485,7 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
                         const result = await bot.editMessageText(text, {
                             chat_id: chatId,
                             message_id: messageId,
-                            parse_mode: 'Markdown',
+                            parse_mode: 'HTML',
                             reply_markup: keyboard
                         });
                         debug('Message edit result', result);
