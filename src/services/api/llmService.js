@@ -29,47 +29,94 @@ class LLMService {
                 history.shift();
             }
 
-            // Create chat context with correct format
-            const chat = this.model.startChat({
-                history: history.map(msg => ({
-                    role: msg.role === 'assistant' ? 'model' : msg.role,
-                    parts: msg.parts
-                }))
-            });
+            try {
+                // Create chat context with correct format
+                const chat = this.model.startChat({
+                    history: history.map(msg => ({
+                        role: msg.role === 'assistant' ? 'model' : msg.role,
+                        parts: msg.parts
+                    })),
+                    generationConfig: {
+                        temperature: 0.7,
+                        topK: 40,
+                        topP: 0.95,
+                        maxOutputTokens: 2048,
+                    },
+                    safetySettings: [
+                        {
+                            category: "HARM_CATEGORY_HARASSMENT",
+                            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+                        },
+                        {
+                            category: "HARM_CATEGORY_HATE_SPEECH",
+                            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+                        },
+                        {
+                            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+                        },
+                        {
+                            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+                            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+                        }
+                    ]
+                });
 
-            // Send message with proper format
-            const result = await chat.sendMessage([{ text: message }]);
-            const response = result.response.text();
+                // Send message with proper format
+                const result = await chat.sendMessage([{ text: message }]);
+                const response = result.response.text();
 
-            // Add response to history with 'model' role
-            history.push({ role: 'model', parts: [{ text: response }] });
-            this.conversationHistory.set(chatId, history);
+                // Clean the response of markdown formatting
+                const cleanedResponse = this.cleanMarkdown(response);
 
-            return response;
+                // Add cleaned response to history
+                history.push({ role: 'model', parts: [{ text: cleanedResponse }] });
+                this.conversationHistory.set(chatId, history);
+
+                return cleanedResponse;
+            } catch (error) {
+                if (error.message?.includes('SAFETY')) {
+                    console.warn('Safety block triggered:', error.message);
+                    return "I apologize, but I cannot provide information about that topic. Please try rephrasing your request or asking about something else.";
+                }
+                throw error; // Re-throw other errors to be caught by outer try-catch
+            }
         } catch (error) {
             console.error('Error generating LLM response:', error);
             return "I'm having trouble processing your request right now. Please try again in a moment. If the problem persists, contact support.";
         }
     }
 
-    checkRateLimit(chatId) {
-        return rateLimitService.checkLLM(chatId);
+    cleanMarkdown(text) {
+        return text
+            // Fix headings with asterisk at the end
+            .replace(/([^*\n]+)\*(\n|$)/g, '*$1*$2')
+            // Convert double asterisks to single asterisks for bold
+            .replace(/\*\*([^*]+)\*\*/g, '*$1*')
+            // Remove italic markers
+            .replace(/\_([^_]+)\_/g, '$1')
+            // Remove code blocks
+            .replace(/```([^`]+)```/g, '$1')
+            // Remove inline code
+            .replace(/`([^`]+)`/g, '$1')
+            // Remove bullet points while preserving indentation
+            .replace(/^\s*\*\s*/gm, '')
+            // Remove extra spaces at start of lines while preserving single indent
+            .replace(/^[ ]{2,}/gm, '')
+            // Ensure paragraphs are separated by double newlines
+            .replace(/([^\n])\n([^\n])/g, '$1\n\n$2')
+            // Normalize multiple newlines to maximum of two
+            .replace(/\n{3,}/g, '\n\n')
+            // Trim any extra whitespace at the start and end
+            .trim();
     }
 
     async sendResponse(bot, chatId, response) {
         try {
-            // First convert Gemini's markdown to Telegram's MarkdownV2 format
+            // The response is already cleaned of markdown, just escape special characters
             let formattedResponse = response
-                // First escape any existing backslashes
-                .replace(/\\/g, '\\\\')
-                // Then escape special characters except those used in markdown
-                .replace(/([[\]()>#+\-=|{}.!])/g, '\\$1')
-                // Convert **text** to *text* for bold (do this after escaping special chars)
-                .replace(/\*\*(.+?)\*\*/g, '*$1*')
-                // Convert _text_ to _text_ for italic
-                .replace(/\_(.+?)\_/g, '_$1_')
-                // Convert ```text``` to `text` for code
-                .replace(/```(.+?)```/g, '`$1`');
+                // Escape special characters except asterisks used for bold
+                .replace(/[[\]()>#+\-=|{}.!\\]/g, '\\$&');
 
             // Split and send long messages
             if (formattedResponse.length <= 4096) {
@@ -102,6 +149,10 @@ class LLMService {
             console.error('Error sending response:', error);
             await bot.sendMessage(chatId, '❌ Sorry, I encountered an error while processing your request\\.');
         }
+    }
+
+    checkRateLimit(chatId) {
+        return rateLimitService.checkLLM(chatId);
     }
 
     async detectIntent(message) {
