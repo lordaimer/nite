@@ -137,3 +137,5 @@ data/bugs.json
 temp/*
 
 src/config/ecosystem.config.cjs
+
+src/services/data/subscriptions.json
