@@ -20,7 +20,8 @@ import {
     setupSubscribeCommand,
     setupTranslateCommand,
     setupBugCommand,
-    setupQuoteCommand
+    setupQuoteCommand,
+    setupWhatToWatchCommand
 } from './commands/index.js';
 
 // Import services
@@ -184,6 +185,7 @@ const commandLimits = {
     translate: { requests: 10, window: 60000 },
     movie: { requests: 10, window: 60000 },
     voice: { requests: 3, window: 60000 },
+    whattowatch: { requests: 10, window: 60000 },
     default: { requests: 15, window: 60000 }
 };
 
@@ -204,12 +206,17 @@ function setupCommandsWithRateLimits() {
         { setup: setupTranslateCommand, name: 'translate' },
         { setup: setupQuoteCommand, name: 'quote' },
         { setup: setupBugCommand, name: 'bug' },
-        { setup: setupDownloadCommand, name: 'download' }
+        { setup: setupDownloadCommand, name: 'download' },
+        { setup: setupWhatToWatchCommand, name: 'whattowatch' }
     ];
 
     commands.forEach(({ setup, name }) => {
         const limit = commandLimits[name] || commandLimits.default;
-        setup(bot, limit);
+        if (name === 'whattowatch') {
+            setup(bot, rateLimitService);
+        } else {
+            setup(bot, limit);
+        }
     });
 }
 

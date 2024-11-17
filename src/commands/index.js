@@ -7,6 +7,7 @@ export { setupImageCommand } from './media/imagineCommand.js';
 export { setupMovieCommand } from './media/movieCommand.js';
 export { setupDownloadCommand } from './media/downloadCommand.js';
 export { setupTranscribeCommand } from './media/transcribeCommand.js';
+export { setupWhatToWatchCommand } from './media/whatToWatchCommand.js';
 
 // Utility Commands
 export { setupTimeCommand } from './utility/timeCommand.js';
