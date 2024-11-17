@@ -49,7 +49,7 @@ export function setupBugCommand(bot, rateLimit = { requests: 1, window: 60000 })
                 description: bugDescription
             };
 
-            const result = await storageService.saveBugReport(bugReport);
+            const result = await storageService.addBugReport(bugReport);
 
             if (result) {
                 await bot.sendMessage(
