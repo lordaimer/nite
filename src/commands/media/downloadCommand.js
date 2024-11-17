@@ -42,6 +42,7 @@ function formatFileSize(bytes) {
 export function setupDownloadCommand(bot) {
     const downloadingUsers = new Set();
     const urlCache = new Map();
+    const originalMessageIds = new Map();
 
     // Combined help message
     const helpText = `
@@ -85,6 +86,7 @@ _Note: Please wait for each download to complete before starting another._`;
             // Generate a short hash for the URL
             const urlHash = crypto.createHash('md5').update(url).digest('hex').slice(0, 8);
             urlCache.set(urlHash, url);
+            originalMessageIds.set(urlHash, msg.message_id);
 
             // Create quality selection buttons
             const keyboard = {
@@ -133,6 +135,7 @@ _Note: Please wait for each download to complete before starting another._`;
                 show_alert: false
             });
             urlCache.delete(urlHash);
+            originalMessageIds.delete(urlHash);
             return;
         }
 
@@ -250,10 +253,11 @@ _Note: Please wait for each download to complete before starting another._`;
                     }
                 );
 
+                const originalMessageId = originalMessageIds.get(urlHash);
                 await bot.sendVideo(chatId, fileStream, {
                     caption: `🎥 *${QUALITY_OPTIONS[quality].match(/\(([^)]+)\)/)[1]}*: ${videoTitle}`,
                     parse_mode: 'Markdown',
-                    reply_to_message_id: query.message.message_id
+                    reply_to_message_id: originalMessageId
                 });
 
                 await bot.deleteMessage(chatId, statusMessage.message_id);
@@ -270,8 +274,9 @@ _Note: Please wait for each download to complete before starting another._`;
             await bot.sendMessage(chatId, errorMessage);
         } finally {
             downloadingUsers.delete(userId);
-            // Clean up the URL cache
+            // Clean up both URL and message ID caches
             urlCache.delete(urlHash);
+            originalMessageIds.delete(urlHash);
         }
     });
-} 
+}
