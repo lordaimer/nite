@@ -139,7 +139,7 @@ export function setupSubscribeCommand(bot) {
             userSubs[subscriptionType].times = [
                 ...userSubs[subscriptionType].times,
                 ...validTimes
-            ];
+            ].sort(); // Sort times for consistent display
         }
 
         // Save to storage
@@ -147,21 +147,14 @@ export function setupSubscribeCommand(bot) {
 
         // Format times for display
         const newTimesStr = validTimes.map(time => {
-            const [hours, minutes] = time.split(':');
             return moment(time, 'HH:mm').format('h:mm A');
         }).join(', ');
 
-        // Only send the success message for new subscriptions
+        // Send success message for new subscriptions only
         await bot.sendMessage(
             chatId,
-            `✅ Added ${subscriptionType} subscription${validTimes.length > 1 ? 's' : ''} at: ${newTimesStr}`,
-            {
-                reply_markup: {
-                    inline_keyboard: [[
-                        { text: 'Cancel Subscription', callback_data: `unsub_${subscriptionType}` }
-                    ]]
-                }
-            }
+            `✅ Successfully subscribed to ${subscriptionType}s at: ${newTimesStr}`,
+            { parse_mode: 'Markdown' }
         );
 
         // If there were any existing times, mention them in a separate message

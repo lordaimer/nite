@@ -1,1 +1,21 @@
-[]
+[
+  {},
+  {
+    "userId": 5880729554,
+    "username": "lordaimer",
+    "userFirstName": "Arane",
+    "description": "the sub command checks if there is already a sub made right after the user makes a new sub. causing two messages being sent. One about the new entry being added and the next one saying there is already a sub at time upon which the previous entry was made.",
+    "id": 1731823791340,
+    "status": "pending",
+    "createdAt": "2024-11-17T06:09:51.340Z"
+  },
+  {
+    "userId": 5880729554,
+    "username": "lordaimer",
+    "userFirstName": "Arane",
+    "description": "translate command being initiated on using transcribe command",
+    "id": 1731824471007,
+    "status": "pending",
+    "createdAt": "2024-11-17T06:21:11.007Z"
+  }
+]

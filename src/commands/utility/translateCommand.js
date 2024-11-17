@@ -182,10 +182,10 @@ Examples: Korean, Arabic, Portuguese, Vietnamese, etc.`,
     };
 
     // Handle /translate or /trns command
-    bot.onText(/\/(translate|trns|trans)(?:\s+([^]+?)\s+)?(.+)?/, async (msg, match) => {
+    bot.onText(/^\/(?:translate|trns|trans)(?:\s+([^]+?)\s+)?(.+)?$/, async (msg, match) => {
         const chatId = msg.chat.id;
-        const targetLangInput = match[2]?.trim();
-        const text = match[3]?.trim();
+        const targetLangInput = match[1]?.trim();
+        const text = match[2]?.trim();
 
         // Help message if no parameters
         if (!targetLangInput && !text) {

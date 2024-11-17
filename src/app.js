@@ -154,64 +154,6 @@ bot.on('voice', async (msg) => {
         );
         return;
     }
-
-    // Skip if user is in transcribe mode
-    if (transcribeModeUsers.has(chatId)) return;
-    
-    try {
-        // Show transcription animation first
-        const statusMessage = await bot.sendMessage(
-            chatId, 
-            '*Transcription in progress* ◡', 
-            { parse_mode: 'MarkdownV2' }
-        );
-
-        const frames = ['◜', '◝', '◞', '◟'];
-        let frameIndex = 0;
-        const animationInterval = setInterval(() => {
-            bot.editMessageText(
-                `*Transcription in progress* ${frames[frameIndex]}`,
-                {
-                    chat_id: chatId,
-                    message_id: statusMessage.message_id,
-                    parse_mode: 'MarkdownV2'
-                }
-            ).catch(() => {});
-            frameIndex = (frameIndex + 1) % frames.length;
-        }, 150);
-
-        // Get the transcription while animation is showing
-        const file = await bot.getFile(msg.voice.file_id);
-        const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
-        const tempFilePath = await voiceService.downloadVoice(fileUrl);
-        const transcription = await voiceService.transcribeAudio(tempFilePath);
-
-        // Clear animation and show transcription
-        clearInterval(animationInterval);
-        const escapedTranscription = transcription.trim().replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
-        
-        await bot.editMessageText(
-            `*Transcription:*\n${escapedTranscription}`,
-            {
-                chat_id: chatId,
-                message_id: statusMessage.message_id,
-                parse_mode: 'MarkdownV2'
-            }
-        );
-
-        // Generate AI response
-        await bot.sendChatAction(chatId, 'typing');
-        const response = await llmService.generateResponse(transcription, chatId);
-        await llmService.sendResponse(bot, chatId, response);
-
-    } catch (error) {
-        console.error('Error processing voice message:', error);
-        await bot.sendMessage(
-            chatId,
-            '❌ Sorry, I had trouble processing your voice message\\. Please try again\\.', 
-            { parse_mode: 'MarkdownV2' }
-        );
-    }
 });
 
 // Global callback query handler to route to appropriate handlers
@@ -258,6 +200,8 @@ function setupCommandsWithRateLimits() {
         { setup: setupMovieCommand, name: 'movie' },
         { setup: setupTranslateCommand, name: 'translate' },
         { setup: setupQuoteCommand, name: 'quote' },
+        { setup: setupBugCommand, name: 'bug' },
+        { setup: setupDownloadCommand, name: 'download' }
     ];
 
     commands.forEach(({ setup, name }) => {
@@ -266,12 +210,13 @@ function setupCommandsWithRateLimits() {
     });
 }
 
+// Only setup commands once
 setupCommandsWithRateLimits();
 
-// Setup admin commands
+// Setup admin commands (these don't need rate limiting)
 setupAdminCommands(bot);
 
-// Setup clear command
+// Setup clear command (doesn't need rate limiting)
 setupClearCommand(bot);
 
 // Add this function to detect meme intents
@@ -380,5 +325,3 @@ function setupGracefulShutdown(bot) {
 }
 
 setupGracefulShutdown(bot);
-setupDownloadCommand(bot);
-setupBugCommand(bot);

@@ -1,7 +1,8 @@
 import { voiceService } from '../../services/api/voiceService.js';
+import { storageService } from '../../services/api/storageService.js';
 
-// Track users who are in transcribe mode
-const transcribeModeUsers = new Set();
+// Track users who are in transcribe mode with timestamps
+const transcribeModeUsers = new Map();  
 
 // Helper function for transcription process with loading animation
 export async function handleTranscription(bot, msg) {
@@ -67,12 +68,27 @@ export async function handleTranscription(bot, msg) {
 }
 
 export function setupTranscribeCommand(bot) {
-    // Handle /transcribe command
-    bot.onText(/\/(transcribe|trcb)/, async (msg) => {
+    // Clear any existing users in transcribe mode
+    transcribeModeUsers.clear();
+
+    // Handle /transcribe command with start anchor and exact match
+    bot.onText(/^\/(?:transcribe|trcb)$/, async (msg) => {
         const chatId = msg.chat.id;
         
-        // Add user to transcribe mode
-        transcribeModeUsers.add(chatId);
+        // Check if user is already in transcribe mode
+        const existingSession = transcribeModeUsers.get(chatId);
+        if (existingSession) {
+            const now = Date.now();
+            // If the session is less than 1 minute old, don't send another message
+            if (now - existingSession < 60000) {
+                return;
+            }
+            // Clean up old session
+            transcribeModeUsers.delete(chatId);
+        }
+        
+        // Add user to transcribe mode with timestamp
+        transcribeModeUsers.set(chatId, Date.now());
         
         await bot.sendMessage(
             chatId, 
@@ -89,7 +105,7 @@ export function setupTranscribeCommand(bot) {
     });
 
     // Handle cancel button callback
-    bot.on('callback_query', async (query) => {
+    const callbackHandler = async (query) => {
         if (query.data === 'cancel_transcribe') {
             const chatId = query.message.chat.id;
             if (transcribeModeUsers.has(chatId)) {
@@ -104,17 +120,35 @@ export function setupTranscribeCommand(bot) {
             }
             await bot.answerCallbackQuery(query.id);
         }
-    });
+    };
+
+    // Remove any existing callback handlers and add the new one
+    bot.removeListener('callback_query', callbackHandler);
+    bot.on('callback_query', callbackHandler);
 
     // Handle voice messages for transcription
-    bot.on('voice', async (msg) => {
+    const voiceHandler = async (msg) => {
         const chatId = msg.chat.id;
 
         if (!transcribeModeUsers.has(chatId)) return;
         transcribeModeUsers.delete(chatId);
 
         await handleTranscription(bot, msg);
-    });
+    };
+
+    // Remove any existing voice handlers and add the new one
+    bot.removeListener('voice', voiceHandler);
+    bot.on('voice', voiceHandler);
+
+    // Clean up old sessions every minute
+    setInterval(() => {
+        const now = Date.now();
+        transcribeModeUsers.forEach((timestamp, chatId) => {
+            if (now - timestamp > 60000) {  // Remove sessions older than 1 minute
+                transcribeModeUsers.delete(chatId);
+            }
+        });
+    }, 60000);
 }
 
-export { transcribeModeUsers }; 
+export { transcribeModeUsers };

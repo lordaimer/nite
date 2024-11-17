@@ -50,16 +50,54 @@ class StorageService {
     addBugReport(report) {
         try {
             const bugs = this.getBugReports();
-            bugs.push({
-                ...report,
-                id: Date.now(),
-                status: 'pending',
-                createdAt: new Date().toISOString()
-            });
-            fs.writeFileSync(this.bugsFile, JSON.stringify(bugs, null, 2));
-            return true;
+
+            // Add file locking to prevent race conditions
+            const lockFile = `${this.bugsFile}.lock`;
+            if (fs.existsSync(lockFile)) {
+                return false;
+            }
+
+            // Create lock file
+            fs.writeFileSync(lockFile, 'locked');
+
+            try {
+                // Check for duplicate reports in the last minute
+                const now = Date.now();
+                const recentDuplicate = bugs.some(bug =>
+                    bug.userId === report.userId &&
+                    bug.description === report.description &&
+                    now - new Date(bug.createdAt).getTime() < 60000
+                );
+
+                if (recentDuplicate) {
+                    return true; // Return true to prevent error message
+                }
+
+                // Add the new report
+                bugs.push({
+                    ...report,
+                    id: Date.now(),
+                    status: 'pending',
+                    createdAt: new Date().toISOString()
+                });
+
+                fs.writeFileSync(this.bugsFile, JSON.stringify(bugs, null, 2));
+                return true;
+            } finally {
+                // Always remove the lock file
+                fs.unlinkSync(lockFile);
+            }
         } catch (error) {
             console.error('Error saving bug report:', error);
+            // Try to clean up lock file if it exists
+            try {
+                const lockFile = `${this.bugsFile}.lock`;
+                if (fs.existsSync(lockFile)) {
+                    fs.unlinkSync(lockFile);
+                }
+            } catch (cleanupError) {
+                console.error('Error cleaning up lock file:', cleanupError);
+            }
             return false;
         }
     }
