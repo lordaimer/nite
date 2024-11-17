@@ -1,95 +1,128 @@
 import fetch from 'node-fetch';
+import dotenv from 'dotenv';
 
-const API_BASE_URL = 'https://api.truthordarebot.xyz/v1';
+dotenv.config();
+
+const APIS = {
+    TRUTH_DARE_BOT: 'https://api.truthordarebot.xyz/v1',
+    API_NINJAS: 'https://api.api-ninjas.com/v1/truthordare'
+};
+
+const API_KEYS = {
+    NINJA: process.env.NINJA_API_KEY
+};
+
 // Set default rating to R with 70% chance, PG13 with 30% chance
 const getRandomRating = () => Math.random() < 0.7 ? 'r' : 'pg13';
 
-// Keywords to detect and replace in questions
-const replacements = {
-    'your friends': 'your partner',
-    'someone in this room': 'your partner',
-    'the group': 'your partner',
-    'everyone here': 'your partner',
-    'the person to your': 'your partner',
-    'anyone here': 'your partner',
-    'someone here': 'your partner'
-};
+// Keywords that indicate group context (questions to filter out)
+const groupContextKeywords = [
+    'group', 'room', 'everyone', 'anybody', 'anyone',
+    'somebody', 'someone', 'people', 'friends', 'players',
+    'person to your left', 'person to your right', 'classmate',
+    'colleague', 'coworker', 'friend', 'crush', 'class',
+    'school', 'work'
+];
 
-function makeQuestionCoupleOriented(question) {
-    let modifiedQuestion = question.toLowerCase();
+// Keywords that indicate couple context (good questions)
+const coupleContextKeywords = [
+    'partner', 'relationship', 'intimate', 'romance', 'romantic',
+    'love', 'kiss', 'date', 'bedroom', 'together', 'sex',
+    'sensual', 'pleasure', 'touch', 'body', 'passion'
+];
+
+function isQuestionCoupleAppropriate(question) {
+    if (!question) return false;
+    const lowerQuestion = question.toLowerCase();
     
-    // Apply replacements
-    for (const [key, value] of Object.entries(replacements)) {
-        modifiedQuestion = modifiedQuestion.replace(new RegExp(key, 'gi'), value);
-    }
+    const hasGroupContext = groupContextKeywords.some(keyword => 
+        lowerQuestion.includes(keyword.toLowerCase())
+    );
     
-    // Capitalize first letter
-    return modifiedQuestion.charAt(0).toUpperCase() + modifiedQuestion.slice(1);
+    if (hasGroupContext) return false;
+    
+    const hasCoupleContext = coupleContextKeywords.some(keyword => 
+        lowerQuestion.includes(keyword.toLowerCase())
+    );
+    
+    return hasCoupleContext || !hasGroupContext;
 }
 
-async function fetchTruthOrDare(type) {
+async function fetchFromTruthDareBot(type, rating) {
     try {
-        const rating = getRandomRating();
-        // Add romantic category to get more couple-oriented questions
-        const response = await fetch(`${API_BASE_URL}/${type}?rating=${rating}&category=romantic`);
+        const response = await fetch(`${APIS.TRUTH_DARE_BOT}/${type}?rating=${rating}&category=romantic`);
         const data = await response.json();
-        
-        if (!data.question) {
-            throw new Error('No question received');
-        }
-
-        const modifiedQuestion = makeQuestionCoupleOriented(data.question);
-        
-        return {
-            question: modifiedQuestion,
-            rating
-        };
+        return data.question;
     } catch (error) {
-        console.error(`Error fetching ${type}:`, error);
-        // Fallback questions if API fails
-        const fallbackQuestions = {
-            truth: {
-                r: [
-                    "What's your wildest fantasy involving us?",
-                    "What's the most intimate thing you want to try with me?",
-                    "What's the sexiest thing about me?",
-                    "What's your favorite memory of us together?",
-                    "What's something you've been too shy to tell me?",
-                ],
-                pg13: [
-                    "What was your first impression of me?",
-                    "What's your favorite physical feature of mine?",
-                    "What's the most romantic thing you want us to do together?",
-                    "What's your favorite moment we've shared?",
-                    "What made you fall for me?",
-                ]
-            },
-            dare: {
-                r: [
-                    "Give your partner a sensual massage for 5 minutes",
-                    "Whisper your wildest fantasy in your partner's ear",
-                    "Do a seductive dance for your partner",
-                    "Kiss your partner in a place you've never kissed before",
-                    "Describe what you want to do to your partner tonight in detail",
-                ],
-                pg13: [
-                    "Give your partner a 30-second neck massage",
-                    "Write a short love poem for your partner right now",
-                    "Do your best romantic slow dance together",
-                    "Give your partner 5 compliments in 30 seconds",
-                    "Act out how you'd rescue your partner from danger",
-                ]
-            }
-        };
-        
-        const questions = fallbackQuestions[type][rating];
-        const randomIndex = Math.floor(Math.random() * questions.length);
-        
-        return {
-            question: questions[randomIndex],
-            rating
-        };
+        console.error('TruthDareBot API Error:', error);
+        return null;
     }
+}
+
+async function fetchFromApiNinjas(type) {
+    try {
+        const response = await fetch(`${APIS.API_NINJAS}?type=${type}`, {
+            headers: {
+                'X-Api-Key': API_KEYS.NINJA
+            }
+        });
+        const data = await response.json();
+        return data[0]?.question;
+    } catch (error) {
+        console.error('API Ninjas Error:', error);
+        return null;
+    }
+}
+
+async function fetchTruthOrDare(type, messageInfo) {
+    const { chatId, messageId, bot } = messageInfo;
+    const MAX_RETRIES = 5;
+    
+    for (let retryCount = 1; retryCount <= MAX_RETRIES; retryCount++) {
+        try {
+            // Update message to show retry attempt
+            if (retryCount > 1) {
+                await bot.editMessageText(`Retrying... (${retryCount}/${MAX_RETRIES})`, {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'Markdown'
+                });
+            }
+
+            const rating = getRandomRating();
+            // 60% chance for TruthDareBot, 40% for API Ninjas
+            const useFirstApi = Math.random() < 0.6;
+            let question;
+
+            if (useFirstApi) {
+                question = await fetchFromTruthDareBot(type, rating);
+            } else {
+                question = await fetchFromApiNinjas(type);
+            }
+            
+            if (question && isQuestionCoupleAppropriate(question)) {
+                return {
+                    question,
+                    rating,
+                    success: true
+                };
+            }
+
+            // Small delay between retries to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+        } catch (error) {
+            console.error(`Error on retry ${retryCount}:`, error);
+            // Continue to next retry
+        }
+    }
+    
+    // If we get here, all retries failed
+    return {
+        question: 'Unable to fetch a question right now. Please try again later.',
+        rating: 'unknown',
+        success: false
+    };
 }
 
 export function setupTruthOrDareCommand(bot) {
@@ -115,14 +148,29 @@ export function setupTruthOrDareCommand(bot) {
         if (!['truth', 'dare'].includes(query.data)) return;
         
         const type = query.data;
-        const result = await fetchTruthOrDare(type);
-        const messageText = type === 'dare' 
-            ? `*Dare:* ${result.question}`
-            : `*Truth:* ${result.question}`;
+        const chatId = query.message.chat.id;
+        const messageId = query.message.message_id;
+
+        // First, update message to show we're fetching
+        await bot.editMessageText('Fetching...', {
+            chat_id: chatId,
+            message_id: messageId,
+            parse_mode: 'Markdown'
+        });
+
+        const result = await fetchTruthOrDare(type, {
+            chatId,
+            messageId,
+            bot
+        });
+
+        const messageText = result.success 
+            ? `*${type.charAt(0).toUpperCase() + type.slice(1)}:* ${result.question}`
+            : result.question;
         
         await bot.editMessageText(messageText, {
-            chat_id: query.message.chat.id,
-            message_id: query.message.message_id,
+            chat_id: chatId,
+            message_id: messageId,
             parse_mode: 'Markdown'
         });
     });
