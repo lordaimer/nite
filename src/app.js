@@ -36,7 +36,7 @@ dotenv.config();
 // Validate environment before bot initialization
 validateEnvironment();
 
-// Initialize bot
+// Initialize the bot
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { 
     polling: true,
     filepath: false  // Disable file path deprecation warning

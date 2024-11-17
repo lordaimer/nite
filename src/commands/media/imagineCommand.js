@@ -1,4 +1,8 @@
 import { HfInference } from '@huggingface/inference';
+import dotenv from 'dotenv';
+
+// Ensure environment variables are loaded
+dotenv.config();
 
 const hf = new HfInference(process.env.HUGGING_FACE_TOKEN);
 
@@ -17,13 +21,18 @@ const generateImage = async (modelId, prompt) => {
     const randomSeed = Math.floor(Math.random() * 2147483647);
     const randomizedPrompt = `${prompt} [t:${timestamp}] [s:${randomSeed}]`;
     
-    return await hf.textToImage({
-        model: modelId,
-        inputs: randomizedPrompt
-    });
+    try {
+        return await hf.textToImage({
+            model: modelId,
+            inputs: randomizedPrompt
+        });
+    } catch (error) {
+        console.error(`Error generating image: ${error.message}`);
+        throw error;
+    }
 };
 
-export function setupImageCommand(bot) {
+export function setupImageCommand(bot, rateLimit) {
     const userSessions = new Map();
     const promptCache = new Map();
     let promptCounter = 0;
@@ -50,10 +59,52 @@ export function setupImageCommand(bot) {
         ]]
     });
 
-    bot.onText(/\/(imagine|im|image) (.+)/, async (msg, match) => {
+    // Handle bare command without prompt
+    bot.onText(/\/(imagine|im|image)$/, async (msg) => {
         const chatId = msg.chat.id;
+        await bot.sendMessage(
+            chatId,
+            '⚠️ Please provide a prompt for the image generation.\n' +
+            'Usage: `/imagine your prompt here`\n\n' +
+            'Example: `/imagine a beautiful sunset over mountains`',
+            { parse_mode: 'Markdown' }
+        );
+    });
+    
+    bot.onText(/\/(imagine|im|image)\s+(.+)/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        const userId = msg.from.id;
         const prompt = match[2];
         const promptId = `p${promptCounter++}`;
+
+        // Check rate limit
+        const userRequests = userSessions.get(userId)?.requests || 0;
+        const lastRequestTime = userSessions.get(userId)?.lastRequest || 0;
+        const currentTime = Date.now();
+
+        // Reset requests if window has passed
+        if (currentTime - lastRequestTime > rateLimit.window) {
+            userSessions.set(userId, { requests: 0, lastRequest: currentTime });
+        }
+
+        // Check if user has exceeded rate limit
+        if (userRequests >= rateLimit.requests) {
+            const timeLeft = Math.ceil((rateLimit.window - (currentTime - lastRequestTime)) / 1000);
+            await bot.sendMessage(
+                chatId,
+                `⚠️ Rate limit exceeded. Please wait ${timeLeft} seconds before trying again.`
+            );
+            return;
+        }
+
+        // Update rate limit tracking
+        userSessions.set(userId, {
+            requests: userRequests + 1,
+            lastRequest: currentTime,
+            promptId,
+            prompt,
+            originalMessageId: msg.message_id
+        });
         
         // Clear previous prompts for this chat
         for (const [key, value] of promptCache.entries()) {
@@ -68,14 +119,6 @@ export function setupImageCommand(bot) {
             prompt: prompt,
             chatId: chatId
         });
-        
-        userSessions.set(chatId, {
-            promptId,
-            prompt, // Add prompt directly to session
-            originalMessageId: msg.message_id
-        });
-
-        console.log(`Received imagine command with prompt: "${prompt}"`);
         
         await bot.sendMessage(
             chatId,
@@ -106,10 +149,6 @@ export function setupImageCommand(bot) {
             }
 
             const prompt = session.prompt;
-            
-            console.log(`Starting generation with model ${modelName}`);
-            console.log(`Using prompt: "${prompt}"`);
-            console.log(`Model ID: ${modelId}`);
 
             await bot.editMessageText(
                 `🎨 Generating image using ${modelName}...`,
@@ -121,7 +160,6 @@ export function setupImageCommand(bot) {
             );
 
             try {
-                console.log(`Starting generation with ${modelName}...`);
                 const response = await generateImage(modelId, prompt);
                 const buffer = Buffer.from(await response.arrayBuffer());
 
@@ -133,12 +171,10 @@ export function setupImageCommand(bot) {
                     reply_markup: getImageActionButtons(session.promptId)
                 });
 
-                // Delete the "Generating..." message instead of updating it
+                // Delete the "Generating..." message
                 await bot.deleteMessage(chatId, messageId);
 
             } catch (error) {
-                console.error(`${modelName}: ${error.message}`);
-                
                 try {
                     await bot.editMessageText(
                         `❌ Failed to generate image using ${modelName}. Please try again.`,
@@ -148,7 +184,6 @@ export function setupImageCommand(bot) {
                         }
                     );
                 } catch (editError) {
-                    // If editing fails, send a new message instead
                     await bot.sendMessage(
                         chatId,
                         `❌ Failed to generate image using ${modelName}. Please try again.`,
@@ -203,4 +238,4 @@ export function setupImageCommand(bot) {
             }
         }
     });
-} 
+}
