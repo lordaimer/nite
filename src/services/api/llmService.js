@@ -76,77 +76,65 @@ class LLMService {
                 return cleanedResponse;
             } catch (error) {
                 if (error.message?.includes('SAFETY')) {
-                    console.warn('Safety block triggered:', error.message);
                     return "I apologize, but I cannot provide information about that topic. Please try rephrasing your request or asking about something else.";
                 }
                 throw error; // Re-throw other errors to be caught by outer try-catch
             }
         } catch (error) {
-            console.error('Error generating LLM response:', error);
             return "I'm having trouble processing your request right now. Please try again in a moment. If the problem persists, contact support.";
         }
     }
 
     cleanMarkdown(text) {
         return text
-            // Fix headings with asterisk at the end
-            .replace(/([^*\n]+)\*(\n|$)/g, '*$1*$2')
-            // Convert double asterisks to single asterisks for bold
-            .replace(/\*\*([^*]+)\*\*/g, '*$1*')
+            // Remove single asterisks at the start of lines
+            .replace(/^\s*\*\s*/gm, '')
+            // Fix incomplete bold markers
+            .replace(/\*([^*\n]+)\*(\n|$)/g, '$1\n')
+            // Properly format bold text
+            .replace(/\*\*([^*]+)\*\*/g, '**$1**')
+            // Remove any remaining single asterisks
+            .replace(/(?<!\*)\*(?!\*)/g, '')
             // Remove italic markers
             .replace(/\_([^_]+)\_/g, '$1')
             // Remove code blocks
             .replace(/```([^`]+)```/g, '$1')
             // Remove inline code
             .replace(/`([^`]+)`/g, '$1')
-            // Remove bullet points while preserving indentation
-            .replace(/^\s*\*\s*/gm, '')
-            // Remove extra spaces at start of lines while preserving single indent
+            // Remove extra spaces at line starts
             .replace(/^[ ]{2,}/gm, '')
             // Ensure paragraphs are separated by double newlines
             .replace(/([^\n])\n([^\n])/g, '$1\n\n$2')
-            // Normalize multiple newlines to maximum of two
+            // Normalize multiple newlines
             .replace(/\n{3,}/g, '\n\n')
-            // Trim any extra whitespace at the start and end
             .trim();
     }
 
     async sendResponse(bot, chatId, response) {
         try {
-            // The response is already cleaned of markdown, just escape special characters
             let formattedResponse = response
-                // Escape special characters except asterisks used for bold
                 .replace(/[[\]()>#+\-=|{}.!\\]/g, '\\$&');
 
-            // Split and send long messages
             if (formattedResponse.length <= 4096) {
-                try {
-                    await bot.sendMessage(chatId, formattedResponse, { 
-                        parse_mode: 'MarkdownV2'
-                    });
-                } catch (markdownError) {
-                    console.error('Markdown parsing error:', markdownError);
-                    console.error('Formatted response:', formattedResponse);
+                await bot.sendMessage(chatId, formattedResponse, { 
+                    parse_mode: 'MarkdownV2'
+                }).catch(() => {
                     // If MarkdownV2 fails, send without parsing
-                    await bot.sendMessage(chatId, response);
-                }
+                    return bot.sendMessage(chatId, response);
+                });
             } else {
                 // Split long responses
                 for (let i = 0; i < formattedResponse.length; i += 4096) {
                     const chunk = formattedResponse.substring(i, Math.min(formattedResponse.length, i + 4096));
-                    try {
-                        await bot.sendMessage(chatId, chunk, { 
-                            parse_mode: 'MarkdownV2'
-                        });
-                    } catch (markdownError) {
-                        console.error('Markdown parsing error:', markdownError);
+                    await bot.sendMessage(chatId, chunk, { 
+                        parse_mode: 'MarkdownV2'
+                    }).catch(() => {
                         // If MarkdownV2 fails, send without parsing
-                        await bot.sendMessage(chatId, response.substring(i, Math.min(response.length, i + 4096)));
-                    }
+                        return bot.sendMessage(chatId, response.substring(i, Math.min(response.length, i + 4096)));
+                    });
                 }
             }
         } catch (error) {
-            console.error('Error sending response:', error);
             await bot.sendMessage(chatId, '❌ Sorry, I encountered an error while processing your request\\.');
         }
     }
