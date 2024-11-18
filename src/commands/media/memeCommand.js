@@ -409,7 +409,7 @@ function setupMemeCommand(bot) {
                 });
             }
         } else if (query.data === 'send_to_yvaine' || query.data === 'send_to_arane') {
-            // First acknowledge the callback without alert
+            // Immediately acknowledge the callback to stop the loading state
             await bot.answerCallbackQuery(query.id);
 
             try {
@@ -460,38 +460,38 @@ function setupMemeCommand(bot) {
                         toId: targetChatId,
                         memeData: null // We don't have the original meme data here
                     });
-
-                    // Send confirmation message
-                    const confirmMessage = await bot.sendMessage(
-                        query.message.chat.id,
-                        '✅ Meme shared successfully! 💝'
-                    );
-
-                    // Delete confirmation after 5 seconds
-                    setTimeout(async () => {
-                        try {
-                            await bot.deleteMessage(query.message.chat.id, confirmMessage.message_id);
-                        } catch (error) {
-                            console.error('Error deleting confirmation message:', error);
-                        }
-                    }, 5000);
                 }
 
-            } catch (error) {
-                console.error('Share error:', error);
-                const errorMessage = await bot.sendMessage(
+                // Send success message that self-destructs after 1.5 seconds
+                const confirmMessage = await bot.sendMessage(
                     query.message.chat.id,
-                    '❌ Sorry, there was an error sharing the meme. Please try again.'
+                    'Meme has been shared 💝'
                 );
 
-                // Delete error message after 5 seconds
+                setTimeout(async () => {
+                    try {
+                        await bot.deleteMessage(query.message.chat.id, confirmMessage.message_id);
+                    } catch (error) {
+                        console.error('Error deleting confirmation message:', error);
+                    }
+                }, 1500);
+
+            } catch (error) {
+                console.error('Error in sharing meme:', error);
+                
+                // Send error message that self-destructs after 1.5 seconds
+                const errorMessage = await bot.sendMessage(
+                    query.message.chat.id,
+                    'Failed to share meme 😔'
+                );
+
                 setTimeout(async () => {
                     try {
                         await bot.deleteMessage(query.message.chat.id, errorMessage.message_id);
                     } catch (error) {
                         console.error('Error deleting error message:', error);
                     }
-                }, 5000);
+                }, 1500);
             }
         } else if (query.data.startsWith('reaction_')) {
             try {
