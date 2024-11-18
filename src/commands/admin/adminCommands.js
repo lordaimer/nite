@@ -1,4 +1,5 @@
 import { config } from '../../config/env.config.js';
+import { stateService } from '../../services/index.js';
 
 // Initialize admin users with the admin ID from config
 const ADMIN_ID = config.telegram.adminId?.toString();
@@ -13,7 +14,7 @@ export function isAdmin(userId) {
 
 export function isAuthorized(userId) {
     const userIdStr = userId?.toString();
-    return isPublicMode || 
+    return stateService.isPublicMode() || 
            userIdStr === ADMIN_ID || 
            userIdStr === ARANE_ID || 
            userIdStr === YVAINE_ID;
@@ -28,7 +29,7 @@ export function setupAdminCommands(bot) {
             return;
         }
 
-        const currentMode = isPublicMode ? '🌐 Public' : '🔒 Private';
+        const currentMode = stateService.isPublicMode() ? '🌐 Public' : '🔒 Private';
         const adminMenu = `
 🛠 *Admin Commands*
 
@@ -54,7 +55,7 @@ _Use these commands responsibly!_`;
                 disable_web_page_preview: true 
             });
         } catch (error) {
-            console.error('Error sending admin menu:', error);
+            console.error('Error sending admin menu:', error.message);
             await bot.sendMessage(msg.chat.id, '⚠️ Error displaying admin menu. Please try again.');
         }
     });
@@ -70,19 +71,23 @@ _Use these commands responsibly!_`;
 
         const requestedMode = match?.[1];
 
-        // If no mode specified, show current status
-        if (!requestedMode) {
-            const currentMode = isPublicMode ? '🌐 Public' : '🔒 Private';
-            await bot.sendMessage(msg.chat.id, `Current access mode: ${currentMode}\n\nUse /access [public|private] to change the mode.`);
-            return;
-        }
+        try {
+            // If no mode specified, show current status
+            if (!requestedMode) {
+                const currentMode = stateService.isPublicMode() ? '🌐 Public' : '🔒 Private';
+                await bot.sendMessage(msg.chat.id, `Current access mode: ${currentMode}\n\nUse /access [public|private] to change the mode.`);
+                return;
+            }
 
-        // Change mode if specified
-        isPublicMode = requestedMode === 'public';
-        const modeEmoji = isPublicMode ? '🌐' : '🔒';
-        const modeText = isPublicMode ? 'public' : 'private';
-        
-        await bot.sendMessage(msg.chat.id, `${modeEmoji} Bot access mode changed to ${modeText}.`);
+            // Change mode if specified
+            await stateService.setAccessMode(requestedMode);
+            const modeEmoji = requestedMode === 'public' ? '🌐' : '🔒';
+            await bot.sendMessage(msg.chat.id, `${modeEmoji} Bot access mode changed to ${requestedMode}.`);
+            
+        } catch (error) {
+            console.error('Error handling access command:', error.message);
+            await bot.sendMessage(msg.chat.id, '⚠️ Error changing access mode. Please try again.');
+        }
     });
 
     // Setup other commands
@@ -167,5 +172,5 @@ function setupUnbanCommand(bot) {
 }
 
 export function getAccessMode() {
-    return isPublicMode ? 'public' : 'private';
+    return stateService.isPublicMode() ? 'public' : 'private';
 }

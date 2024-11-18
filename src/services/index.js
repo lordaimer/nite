@@ -7,3 +7,4 @@ export { storageService } from './api/storageService.js';
 
 // Database Services
 // Add database service exports here when implemented
+export { default as stateService } from './stateService.js';
