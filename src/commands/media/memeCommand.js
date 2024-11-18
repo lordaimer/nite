@@ -155,7 +155,36 @@ const getCustomInlineKeyboard = (chatId, preferredSubreddit) => {
 
 async function sendMemeWithKeyboard(bot, chatId, meme, preferredSubreddit, mediaType = 'pics') {
     try {
-        // Remove "Another Random Meme" button from previous meme message if it exists
+        // Escape special characters in the title and author for Markdown
+        const escapedTitle = meme.title.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
+        const escapedAuthor = meme.author.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
+        const escapedSubreddit = meme.subreddit.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
+
+        const caption = `${escapedTitle}\n\n` +
+                       `👤 Posted by u/${escapedAuthor}\n` +
+                       `📊 ${meme.upvotes.toLocaleString()} upvotes\n` +
+                       `🔗 [Original Post](${meme.link})\n` +
+                       `📍 From r/${escapedSubreddit}`;
+
+        const keyboard = getCustomInlineKeyboard(chatId, preferredSubreddit);
+
+        // Send the meme
+        let sentMessage;
+        if (meme.isVideo) {
+            sentMessage = await bot.sendVideo(chatId, meme.url, {
+                caption: caption,
+                parse_mode: 'Markdown',
+                reply_markup: keyboard
+            });
+        } else {
+            sentMessage = await bot.sendPhoto(chatId, meme.url, {
+                caption: caption,
+                parse_mode: 'Markdown',
+                reply_markup: keyboard
+            });
+        }
+        
+        // After successfully sending the new message, update the previous message's keyboard
         const lastMessage = lastMemeMessages.get(chatId);
         if (lastMessage) {
             try {
@@ -187,35 +216,6 @@ async function sendMemeWithKeyboard(bot, chatId, meme, preferredSubreddit, media
             }
         }
 
-        // Escape special characters in the title and author for Markdown
-        const escapedTitle = meme.title.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
-        const escapedAuthor = meme.author.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
-        const escapedSubreddit = meme.subreddit.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
-
-        const caption = `${escapedTitle}\n\n` +
-                       `👤 Posted by u/${escapedAuthor}\n` +
-                       `📊 ${meme.upvotes.toLocaleString()} upvotes\n` +
-                       `🔗 [Original Post](${meme.link})\n` +
-                       `📍 From r/${escapedSubreddit}`;
-
-        const keyboard = getCustomInlineKeyboard(chatId, preferredSubreddit);
-
-        // Send the meme
-        let sentMessage;
-        if (meme.isVideo) {
-            sentMessage = await bot.sendVideo(chatId, meme.url, {
-                caption: caption,
-                parse_mode: 'Markdown',
-                reply_markup: keyboard
-            });
-        } else {
-            sentMessage = await bot.sendPhoto(chatId, meme.url, {
-                caption: caption,
-                parse_mode: 'Markdown',
-                reply_markup: keyboard
-            });
-        }
-        
         // Store meme data for reaction tracking
         sharedMemes.set(sentMessage.message_id, {
             fromId: null,
