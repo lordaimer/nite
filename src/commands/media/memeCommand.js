@@ -155,6 +155,38 @@ const getCustomInlineKeyboard = (chatId, preferredSubreddit) => {
 
 async function sendMemeWithKeyboard(bot, chatId, meme, preferredSubreddit, mediaType = 'pics') {
     try {
+        // Remove "Another Random Meme" button from previous meme message if it exists
+        const lastMessage = lastMemeMessages.get(chatId);
+        if (lastMessage) {
+            try {
+                // Keep only the appropriate share button based on chat ID
+                let shareButton;
+                if (chatId === Number(process.env.ARANE_CHAT_ID)) {
+                    shareButton = {
+                        text: 'Send to Yvaine ❤️',
+                        callback_data: 'send_to_yvaine'
+                    };
+                } else if (chatId === Number(process.env.YVAINE_CHAT_ID)) {
+                    shareButton = {
+                        text: 'Send to Arane ❤️',
+                        callback_data: 'send_to_arane'
+                    };
+                }
+
+                if (shareButton) {
+                    await bot.editMessageReplyMarkup({
+                        inline_keyboard: [[shareButton]]
+                    }, {
+                        chat_id: chatId,
+                        message_id: lastMessage
+                    });
+                }
+            } catch (error) {
+                // Ignore errors (message might be too old or already deleted)
+                console.log('Could not update previous keyboard:', error.message);
+            }
+        }
+
         // Escape special characters in the title and author for Markdown
         const escapedTitle = meme.title.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
         const escapedAuthor = meme.author.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
@@ -190,6 +222,11 @@ async function sendMemeWithKeyboard(bot, chatId, meme, preferredSubreddit, media
             toId: chatId,
             memeData: meme
         });
+
+        // Store the ID of the sent message
+        if (sentMessage) {
+            lastMemeMessages.set(chatId, sentMessage.message_id);
+        }
 
         return sentMessage;
     } catch (error) {
