@@ -461,22 +461,29 @@ function setupMemeCommand(bot) {
                         memeData: null // We don't have the original meme data here
                     });
 
-                    // Update button to show success
-                    await bot.editMessageReplyMarkup({
-                        inline_keyboard: [[{
+                    // Get the current keyboard and update only the share button
+                    const currentKeyboard = query.message.reply_markup.inline_keyboard;
+                    const updatedKeyboard = [
+                        currentKeyboard[0], // Keep the "Another Random Meme" button
+                        [{ // Replace the share button with success message
                             text: 'Meme shared! 💝',
                             callback_data: 'dummy_callback'
-                        }]]
+                        }]
+                    ];
+
+                    // Update keyboard with success message
+                    await bot.editMessageReplyMarkup({
+                        inline_keyboard: updatedKeyboard
                     }, {
                         chat_id: query.message.chat.id,
                         message_id: query.message.message_id
                     });
 
-                    // Remove the button after 1.5 seconds
+                    // Remove only the share button after 1.5 seconds
                     setTimeout(async () => {
                         try {
                             await bot.editMessageReplyMarkup({
-                                inline_keyboard: []
+                                inline_keyboard: [currentKeyboard[0]] // Keep only the "Another Random Meme" button
                             }, {
                                 chat_id: query.message.chat.id,
                                 message_id: query.message.message_id
@@ -490,23 +497,30 @@ function setupMemeCommand(bot) {
             } catch (error) {
                 console.error('Error in sharing meme:', error);
                 
-                // Update button to show error
+                // Update button to show error while preserving "Another Random Meme" button
                 try {
-                    await bot.editMessageReplyMarkup({
-                        inline_keyboard: [[{
+                    const currentKeyboard = query.message.reply_markup.inline_keyboard;
+                    const updatedKeyboard = [
+                        currentKeyboard[0], // Keep the "Another Random Meme" button
+                        [{ // Replace the share button with error message
                             text: 'Failed to share 😔',
                             callback_data: 'dummy_callback'
-                        }]]
+                        }]
+                    ];
+
+                    // Update keyboard with error message
+                    await bot.editMessageReplyMarkup({
+                        inline_keyboard: updatedKeyboard
                     }, {
                         chat_id: query.message.chat.id,
                         message_id: query.message.message_id
                     });
 
-                    // Remove the button after 1.5 seconds
+                    // Remove only the share button after 1.5 seconds
                     setTimeout(async () => {
                         try {
                             await bot.editMessageReplyMarkup({
-                                inline_keyboard: []
+                                inline_keyboard: [currentKeyboard[0]] // Keep only the "Another Random Meme" button
                             }, {
                                 chat_id: query.message.chat.id,
                                 message_id: query.message.message_id
