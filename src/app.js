@@ -46,6 +46,32 @@ const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
     filepath: false  // Disable file path deprecation warning
 });
 
+// Setup bot connection and error handling first
+function setupBotConnection() {
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 10;
+
+    bot.on('polling_error', (error) => {
+        console.error('Polling error:', error);
+        if (reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++;
+            setTimeout(() => {
+                console.log(`Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`);
+                bot.stopPolling().then(() => bot.startPolling());
+            }, 5000 * Math.pow(2, reconnectAttempts));
+        } else {
+            console.error('Max reconnection attempts reached');
+            process.exit(1); // Let process manager restart the bot
+        }
+    });
+
+    bot.on('webhook_error', (error) => {
+        console.error('Webhook error:', error);
+    });
+}
+
+setupBotConnection();
+
 // Setup admin commands first (these don't need rate limiting)
 setupAdminCommands(bot);
 
@@ -276,29 +302,6 @@ function cleanupResources() {
 
 // Run cleanup every 6 hours
 setInterval(cleanupResources, 6 * 60 * 60 * 1000);
-
-function setupBotConnection() {
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 10;
-
-    bot.on('polling_error', (error) => {
-        console.error('Polling error:', error);
-        if (reconnectAttempts < maxReconnectAttempts) {
-            reconnectAttempts++;
-            setTimeout(() => {
-                console.log(`Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`);
-                bot.stopPolling().then(() => bot.startPolling());
-            }, 5000 * Math.pow(2, reconnectAttempts));
-        } else {
-            console.error('Max reconnection attempts reached');
-            process.exit(1); // Let process manager restart the bot
-        }
-    });
-
-    bot.on('webhook_error', (error) => {
-        console.error('Webhook error:', error);
-    });
-}
 
 setupScheduler(bot);
 
