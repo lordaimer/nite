@@ -16,6 +16,14 @@ I am a versatile personal assistant bot currently under development.`;
 
     const commands = [
         {
+            command: '/start',
+            description: 'Start interacting with the bot',
+            usage: '/start',
+            examples: ['/start'],
+            category: 'Utilities',
+            note: '\nUse this command to begin interaction or restart the bot.'
+        },
+        {
             command: '/time, /tm',
             description: 'Display real-time chronological data',
             usage: '/time [timezone]',
@@ -116,6 +124,66 @@ I am a versatile personal assistant bot currently under development.`;
             note: '\nSupports multiple languages with auto-detection capability.'
         },
         {
+            command: '/quote, /qt',
+            description: 'Get random motivational quotes with authors and tags',
+            usage: '/quote',
+            examples: ['/quote', '/qt'],
+            category: 'Entertainment',
+            note: '\nClick "Another Quote" to get a new quote without using the command again.'
+        },
+        {
+            command: '/download, /dl',
+            description: 'Download videos from various platforms',
+            usage: '/download <url>',
+            examples: [
+                '/download https://youtube.com/watch?v=...',
+                '/dl https://vimeo.com/...'
+            ],
+            category: 'Media',
+            note: '\nSupports multiple platforms including YouTube, Vimeo, and more.'
+        },
+        {
+            command: '/whattowatch, /wtw',
+            description: 'Get personalized movie and TV show recommendations',
+            usage: '/whattowatch',
+            examples: ['/whattowatch', '/wtw'],
+            category: 'Entertainment',
+            note: '\nUse the interactive buttons to refine your recommendations.'
+        },
+        {
+            command: '/subscribe, /sub',
+            description: 'Subscribe to any of the media commands: /meme, /facts, /joke, /quote',
+            usage: '/subscribe',
+            examples: ['/subscribe', '/sub'],
+            category: 'Utilities'
+        },
+        {
+            command: '/unsubscribe, /unsub',
+            description: 'Unsubscribe from any active media command subscriptions',
+            usage: '/unsubscribe',
+            examples: ['/unsubscribe', '/unsub'],
+            category: 'Utilities'
+        },
+        {
+            command: '/mysubs',
+            description: 'View all your active media command subscriptions',
+            usage: '/mysubs',
+            examples: ['/mysubs'],
+            category: 'Utilities'
+        },
+        {
+            command: '/truthordare, /trd',
+            description: 'Play Truth or Dare game',
+            usage: '/truthordare [truth|dare]',
+            examples: [
+                '/truthordare',
+                '/tod truth',
+                '/tod dare'
+            ],
+            category: 'Entertainment',
+            note: '\nUse buttons to choose between truth or dare, or specify in the command.'
+        },
+        {
             command: '/bug',
             description: 'Report a bug or issue with the bot',
             usage: '/bug <description>',
@@ -125,14 +193,6 @@ I am a versatile personal assistant bot currently under development.`;
             ],
             category: 'Support',
             note: '\nBug reports are reviewed by administrators. Please provide clear and detailed descriptions to help improve the bot.'
-        },
-        {
-            command: '/quote, /qt',
-            description: 'Get random motivational quotes with authors and tags',
-            usage: '/quote',
-            examples: ['/quote', '/qt'],
-            category: 'Entertainment',
-            note: '\nClick "Another Quote" to get a new quote without using the command again.'
         }
     ];
 
