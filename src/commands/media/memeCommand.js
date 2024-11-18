@@ -23,7 +23,7 @@ try {
 }
 
 // Add this after other constants
-export const userPreferences = new Map(); // chatId -> { subreddit, mediaType }
+export const userPreferences = new Map(); // chatId -> { subreddit, mediaType, defaultMediaType }
 
 const lastMemeMessages = new Map(); // Stores the last meme message ID for each chat
 
@@ -190,16 +190,6 @@ async function sendMemeWithKeyboard(bot, chatId, meme, preferredSubreddit, media
 
         const keyboard = getCustomInlineKeyboard(chatId, preferredSubreddit);
 
-        // Delete previous meme message if it exists
-        const lastMessageId = lastMemeMessages.get(chatId);
-        if (lastMessageId) {
-            try {
-                await bot.deleteMessage(chatId, lastMessageId);
-            } catch (error) {
-                console.error('Error deleting previous message:', error.message);
-            }
-        }
-
         // Send the meme
         let sentMessage;
         if (meme.isVideo) {
@@ -215,9 +205,6 @@ async function sendMemeWithKeyboard(bot, chatId, meme, preferredSubreddit, media
                 reply_markup: keyboard
             });
         }
-
-        // Store the new message ID
-        lastMemeMessages.set(chatId, sentMessage.message_id);
         
         // Store meme data for reaction tracking
         sharedMemes.set(sentMessage.message_id, {
@@ -239,19 +226,28 @@ function setupMemeCommand(bot) {
         const args = match[2] ? match[2].toLowerCase().split(' ') : [];
         
         try {
-            let mediaType = 'pics';  // default to pics
+            let mediaType = 'pics';  // default to pics if no preference set
             let specificSubreddit = null;
             let userPref = userPreferences.get(chatId) || {};
+
+            // Get user's default mediaType if set
+            if (userPref.defaultMediaType) {
+                mediaType = userPref.defaultMediaType;
+            }
 
             // Parse arguments
             if (args.length > 0) {
                 if (args[0] === 'vids' || args[0] === 'pics') {
                     mediaType = args[0];
+                    // Set this as the default media type
+                    userPref.defaultMediaType = args[0];
                     if (args[1]) {
                         specificSubreddit = args[1];
                     }
                 } else if (args[0] === 'random') {
-                    specificSubreddit = 'random';
+                    mediaType = Math.random() < 0.5 ? 'pics' : 'vids';
+                    userPref.defaultMediaType = 'random';
+                    specificSubreddit = args[1] || null;
                 } else {
                     specificSubreddit = args[0];
                 }
@@ -267,7 +263,6 @@ function setupMemeCommand(bot) {
             );
 
             // Update user preferences
-            userPref.mediaType = mediaType;
             if (specificSubreddit && specificSubreddit !== 'random') {
                 userPref.subreddit = specificSubreddit;
             }
@@ -276,7 +271,7 @@ function setupMemeCommand(bot) {
             // Get and send meme
             const meme = await getMemeFromReddit(
                 specificSubreddit === 'random' ? null : specificSubreddit,
-                mediaType
+                userPref.defaultMediaType === 'random' ? (Math.random() < 0.5 ? 'pics' : 'vids') : mediaType
             );
             
             await sendMemeWithKeyboard(bot, chatId, meme, userPref.subreddit, mediaType);
