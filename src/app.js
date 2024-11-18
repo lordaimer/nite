@@ -21,7 +21,7 @@ import {
     setupTranslateCommand,
     setupBugCommand,
     setupQuoteCommand,
-    setupWhatToWatchCommand
+    setupWhatToWatchCommand,
     setupTruthOrDareCommand
 } from './commands/index.js';
 
