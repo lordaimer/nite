@@ -460,38 +460,64 @@ function setupMemeCommand(bot) {
                         toId: targetChatId,
                         memeData: null // We don't have the original meme data here
                     });
+
+                    // Update button to show success
+                    await bot.editMessageReplyMarkup({
+                        inline_keyboard: [[{
+                            text: 'Meme shared! 💝',
+                            callback_data: 'dummy_callback'
+                        }]]
+                    }, {
+                        chat_id: query.message.chat.id,
+                        message_id: query.message.message_id
+                    });
+
+                    // Remove the button after 1.5 seconds
+                    setTimeout(async () => {
+                        try {
+                            await bot.editMessageReplyMarkup({
+                                inline_keyboard: []
+                            }, {
+                                chat_id: query.message.chat.id,
+                                message_id: query.message.message_id
+                            });
+                        } catch (error) {
+                            console.error('Error removing share button:', error);
+                        }
+                    }, 1500);
                 }
-
-                // Send success message that self-destructs after 1.5 seconds
-                const confirmMessage = await bot.sendMessage(
-                    query.message.chat.id,
-                    'Meme has been shared 💝'
-                );
-
-                setTimeout(async () => {
-                    try {
-                        await bot.deleteMessage(query.message.chat.id, confirmMessage.message_id);
-                    } catch (error) {
-                        console.error('Error deleting confirmation message:', error);
-                    }
-                }, 1500);
 
             } catch (error) {
                 console.error('Error in sharing meme:', error);
                 
-                // Send error message that self-destructs after 1.5 seconds
-                const errorMessage = await bot.sendMessage(
-                    query.message.chat.id,
-                    'Failed to share meme 😔'
-                );
+                // Update button to show error
+                try {
+                    await bot.editMessageReplyMarkup({
+                        inline_keyboard: [[{
+                            text: 'Failed to share 😔',
+                            callback_data: 'dummy_callback'
+                        }]]
+                    }, {
+                        chat_id: query.message.chat.id,
+                        message_id: query.message.message_id
+                    });
 
-                setTimeout(async () => {
-                    try {
-                        await bot.deleteMessage(query.message.chat.id, errorMessage.message_id);
-                    } catch (error) {
-                        console.error('Error deleting error message:', error);
-                    }
-                }, 1500);
+                    // Remove the button after 1.5 seconds
+                    setTimeout(async () => {
+                        try {
+                            await bot.editMessageReplyMarkup({
+                                inline_keyboard: []
+                            }, {
+                                chat_id: query.message.chat.id,
+                                message_id: query.message.message_id
+                            });
+                        } catch (error) {
+                            console.error('Error removing share button:', error);
+                        }
+                    }, 1500);
+                } catch (error) {
+                    console.error('Error updating error button:', error);
+                }
             }
         } else if (query.data.startsWith('reaction_')) {
             try {
