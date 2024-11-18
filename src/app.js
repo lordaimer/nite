@@ -1,5 +1,8 @@
-import TelegramBot from 'node-telegram-bot-api';
+// Load environment variables first
 import dotenv from 'dotenv';
+dotenv.config();
+
+import TelegramBot from 'node-telegram-bot-api';
 import URLParse from 'url-parse';
 
 // Import commands
@@ -21,18 +24,18 @@ import {
     setupTranslateCommand,
     setupBugCommand,
     setupQuoteCommand,
-    setupWhatToWatchCommand
+    setupWhatToWatchCommand,
     setupTruthOrDareCommand
 } from './commands/index.js';
 
 // Import services
 import { llmService, voiceService, setupScheduler, rateLimitService, storageService } from './services/index.js';
 
+// Import middleware
+import { setupAccessControl } from './middleware/accessControl.js';
+
 // Import config
 import { validateEnvironment } from './config/env.config.js';
-
-// Load environment variables
-dotenv.config();
 
 // Validate environment before bot initialization
 validateEnvironment();
@@ -42,6 +45,59 @@ const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
     polling: true,
     filepath: false  // Disable file path deprecation warning
 });
+
+// Setup admin commands first (these don't need rate limiting)
+setupAdminCommands(bot);
+
+// Setup access control middleware
+setupAccessControl(bot);
+
+// Setup all commands with rate limiting
+function setupCommandsWithRateLimits() {
+    const commands = [
+        { setup: setupTimeCommand, name: 'time' },
+        { setup: setupHelpCommand, name: 'help' },
+        { setup: setupStartCommand, name: 'start' },
+        { setup: setupCurrencyCommand, name: 'currency' },
+        { setup: setupMemeCommand, name: 'meme' },
+        { setup: setupJokeCommand, name: 'joke' },
+        { setup: setupFactCommand, name: 'fact' },
+        { setup: setupImageCommand, name: 'imagine' },
+        { setup: setupTranscribeCommand, name: 'voice' },
+        { setup: setupSubscribeCommand, name: 'subscribe' },
+        { setup: setupMovieCommand, name: 'movie' },
+        { setup: setupTranslateCommand, name: 'translate' },
+        { setup: setupQuoteCommand, name: 'quote' },
+        { setup: setupBugCommand, name: 'bug' },
+        { setup: setupDownloadCommand, name: 'download' },
+        { setup: setupWhatToWatchCommand, name: 'whattowatch' },
+        { setup: setupTruthOrDareCommand, name: 'truthordare' }
+    ];
+
+    const commandLimits = {
+        meme: { requests: 8, window: 60000 },
+        imagine: { requests: 3, window: 60000 },
+        translate: { requests: 10, window: 60000 },
+        movie: { requests: 10, window: 60000 },
+        voice: { requests: 3, window: 60000 },
+        whattowatch: { requests: 10, window: 60000 },
+        default: { requests: 15, window: 60000 }
+    };
+
+    commands.forEach(({ setup, name }) => {
+        const limit = commandLimits[name] || commandLimits.default;
+        if (name === 'whattowatch') {
+            setup(bot, rateLimitService);
+        } else {
+            setup(bot, limit);
+        }
+    });
+}
+
+setupCommandsWithRateLimits();
+
+// Setup clear command (doesn't need rate limiting)
+setupClearCommand(bot);
 
 // Add message handler before command setup
 bot.on('message', async (msg) => {
@@ -178,75 +234,6 @@ bot.on('callback_query', async (query) => {
         }
     }
 });
-
-// Command rate limits configuration
-const commandLimits = {
-    meme: { requests: 8, window: 60000 },
-    imagine: { requests: 3, window: 60000 },
-    translate: { requests: 10, window: 60000 },
-    movie: { requests: 10, window: 60000 },
-    voice: { requests: 3, window: 60000 },
-    whattowatch: { requests: 10, window: 60000 },
-    default: { requests: 15, window: 60000 }
-};
-
-// Setup all commands with rate limiting
-function setupCommandsWithRateLimits() {
-    const commands = [
-        { setup: setupTimeCommand, name: 'time' },
-        { setup: setupHelpCommand, name: 'help' },
-        { setup: setupStartCommand, name: 'start' },
-        { setup: setupCurrencyCommand, name: 'currency' },
-        { setup: setupMemeCommand, name: 'meme' },
-        { setup: setupJokeCommand, name: 'joke' },
-        { setup: setupFactCommand, name: 'fact' },
-        { setup: setupImageCommand, name: 'imagine' },
-        { setup: setupTranscribeCommand, name: 'voice' },
-        { setup: setupSubscribeCommand, name: 'subscribe' },
-        { setup: setupMovieCommand, name: 'movie' },
-        { setup: setupTranslateCommand, name: 'translate' },
-        { setup: setupQuoteCommand, name: 'quote' },
-        { setup: setupBugCommand, name: 'bug' },
-        { setup: setupDownloadCommand, name: 'download' },
-        { setup: setupWhatToWatchCommand, name: 'whattowatch' },
-        { setup: setupTruthOrDareCommand, name: 'truthordare' }
-    ];
-
-    commands.forEach(({ setup, name }) => {
-        const limit = commandLimits[name] || commandLimits.default;
-        if (name === 'whattowatch') {
-            setup(bot, rateLimitService);
-        } else {
-            setup(bot, limit);
-        }
-    });
-}
-
-// Only setup commands once
-setupCommandsWithRateLimits();
-
-// Setup admin commands (these don't need rate limiting)
-setupAdminCommands(bot);
-
-// Setup clear command (doesn't need rate limiting)
-setupClearCommand(bot);
-
-// Add this function to detect meme intents
-function detectMemeIntent(text) {
-    const memeKeywords = [
-        'send me a meme',
-        'show me a meme',
-        'i want a meme',
-        'give me a meme',
-        'share a meme',
-        'need a meme',
-        'meme please',
-        'another meme'
-    ];
-    
-    const normalizedText = text.toLowerCase().trim();
-    return memeKeywords.some(keyword => normalizedText.includes(keyword));
-}
 
 process.on('uncaughtException', (error) => {
     console.error('Error:', error.message);

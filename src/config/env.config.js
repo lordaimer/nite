@@ -1,3 +1,8 @@
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
+
 export function validateEnvironment() {
     const requiredEnvVars = [
         'TELEGRAM_BOT_TOKEN',
@@ -23,6 +28,7 @@ export function validateEnvironment() {
     return true;
 }
 
+// Export config with environment variables
 export const config = {
     telegram: {
         token: process.env.TELEGRAM_BOT_TOKEN,
