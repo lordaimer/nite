@@ -230,9 +230,13 @@ function setupMemeCommand(bot) {
             let specificSubreddit = null;
             let userPref = userPreferences.get(chatId) || {};
 
-            // Get user's default mediaType if set
-            if (userPref.defaultMediaType) {
-                mediaType = userPref.defaultMediaType;
+            // Get user's default mediaType if set and no specific type requested
+            if (userPref.defaultMediaType && args.length === 0) {
+                if (userPref.defaultMediaType === 'random') {
+                    mediaType = Math.random() < 0.5 ? 'pics' : 'vids';
+                } else {
+                    mediaType = userPref.defaultMediaType;
+                }
             }
 
             // Parse arguments
@@ -241,12 +245,24 @@ function setupMemeCommand(bot) {
                     mediaType = args[0];
                     // Set this as the default media type
                     userPref.defaultMediaType = args[0];
+                    // Send confirmation message
+                    await bot.sendMessage(
+                        chatId,
+                        `✅ Default meme mode set to: ${args[0] === 'vids' ? 'Videos' : 'Pictures'}\nFuture /mm commands will fetch ${args[0] === 'vids' ? 'video' : 'picture'} memes by default.`,
+                        { parse_mode: 'Markdown' }
+                    );
                     if (args[1]) {
                         specificSubreddit = args[1];
                     }
                 } else if (args[0] === 'random') {
                     mediaType = Math.random() < 0.5 ? 'pics' : 'vids';
                     userPref.defaultMediaType = 'random';
+                    // Send confirmation message
+                    await bot.sendMessage(
+                        chatId,
+                        '✅ Default meme mode set to: Random\nFuture /mm commands will randomly fetch either picture or video memes.',
+                        { parse_mode: 'Markdown' }
+                    );
                     specificSubreddit = args[1] || null;
                 } else {
                     specificSubreddit = args[0];
@@ -271,7 +287,7 @@ function setupMemeCommand(bot) {
             // Get and send meme
             const meme = await getMemeFromReddit(
                 specificSubreddit === 'random' ? null : specificSubreddit,
-                userPref.defaultMediaType === 'random' ? (Math.random() < 0.5 ? 'pics' : 'vids') : mediaType
+                mediaType
             );
             
             await sendMemeWithKeyboard(bot, chatId, meme, userPref.subreddit, mediaType);
@@ -345,61 +361,75 @@ function setupMemeCommand(bot) {
                 const title = originalCaption.split('\n\n')[0]
                     .replace(/([*_`\[\]])/g, '\\$1');
 
-                const photo = query.message.photo[query.message.photo.length - 1].file_id;
-
                 const senderInfo = query.data === 'send_to_yvaine' 
                     ? '*Meme shared by Arane 💝*'
                     : '*Meme shared by Yvaine 💝*';
                 const newCaption = `${title}\n\n${senderInfo}`;
 
-                // Send the meme
-                const sentMessage = await bot.sendPhoto(
-                    targetChatId,
-                    photo,
-                    {
-                        caption: newCaption,
-                        parse_mode: 'Markdown',
-                        reply_markup: getReactionKeyboard()
-                    }
-                );
+                let sentMessage;
+                // Check if it's a photo or video
+                if (query.message.photo && query.message.photo.length > 0) {
+                    const photo = query.message.photo[query.message.photo.length - 1].file_id;
+                    // Send the photo meme
+                    sentMessage = await bot.sendPhoto(
+                        targetChatId,
+                        photo,
+                        {
+                            caption: newCaption,
+                            parse_mode: 'Markdown',
+                            reply_markup: getReactionKeyboard()
+                        }
+                    );
+                } else if (query.message.video) {
+                    // Send the video meme
+                    sentMessage = await bot.sendVideo(
+                        targetChatId,
+                        query.message.video.file_id,
+                        {
+                            caption: newCaption,
+                            parse_mode: 'Markdown',
+                            reply_markup: getReactionKeyboard()
+                        }
+                    );
+                }
 
-                // Track the shared meme
-                sharedMemes.set(sentMessage.message_id, {
-                    fromId: query.message.chat.id,
-                    toId: targetChatId,
-                    memeData: {
-                        title: title,
-                        photo: photo
-                    }
-                });
+                // Store meme data for reaction tracking
+                if (sentMessage) {
+                    sharedMemes.set(sentMessage.message_id, {
+                        fromId: query.from.id,
+                        toId: targetChatId,
+                        memeData: null // We don't have the original meme data here
+                    });
 
-                // Send confirmation message and delete after 5 seconds
-                const confirmMessage = await bot.sendMessage(
-                    query.message.chat.id,
-                    'Meme has been shared successfully! 💝'
-                );
-                
-                setTimeout(async () => {
-                    try {
-                        await bot.deleteMessage(query.message.chat.id, confirmMessage.message_id);
-                    } catch (deleteError) {
-                        console.log('Error deleting confirmation message:', deleteError.message);
-                    }
-                }, 5000);
+                    // Send confirmation message
+                    const confirmMessage = await bot.sendMessage(
+                        query.message.chat.id,
+                        '✅ Meme shared successfully! 💝'
+                    );
+
+                    // Delete confirmation after 5 seconds
+                    setTimeout(async () => {
+                        try {
+                            await bot.deleteMessage(query.message.chat.id, confirmMessage.message_id);
+                        } catch (error) {
+                            console.error('Error deleting confirmation message:', error);
+                        }
+                    }, 5000);
+                }
 
             } catch (error) {
                 console.error('Share error:', error);
-                // Send error message and delete after 5 seconds
                 const errorMessage = await bot.sendMessage(
                     query.message.chat.id,
-                    '❌ Failed to share meme. Please try again.'
+                    '❌ Sorry, there was an error sharing the meme. Please try again.'
                 );
 
+                // Delete error message after 5 seconds
                 setTimeout(async () => {
                     try {
                         await bot.deleteMessage(query.message.chat.id, errorMessage.message_id);
-                    } catch (deleteError) {
-                        console.log('Error deleting error message:', deleteError.message);
+                    } catch (error) {
+                        console.error('Error deleting error message:', error);
                     }
                 }, 5000);
             }
