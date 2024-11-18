@@ -22,6 +22,7 @@ import {
     setupBugCommand,
     setupQuoteCommand,
     setupWhatToWatchCommand
+    setupTruthOrDareCommand
 } from './commands/index.js';
 
 // Import services
@@ -207,7 +208,8 @@ function setupCommandsWithRateLimits() {
         { setup: setupQuoteCommand, name: 'quote' },
         { setup: setupBugCommand, name: 'bug' },
         { setup: setupDownloadCommand, name: 'download' },
-        { setup: setupWhatToWatchCommand, name: 'whattowatch' }
+        { setup: setupWhatToWatchCommand, name: 'whattowatch' },
+        { setup: setupTruthOrDareCommand, name: 'truthordare' }
     ];
 
     commands.forEach(({ setup, name }) => {
