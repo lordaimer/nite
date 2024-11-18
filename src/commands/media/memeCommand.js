@@ -328,16 +328,29 @@ function setupMemeCommand(bot) {
                 }, 3000);
                 
                 try {
+                    // Get user preferences
+                    const userPref = userPreferences.get(chatId) || {};
+                    let targetSubreddit = null;
+                    let mediaType = 'pics';  // default
+
                     if (subreddit === 'random') {
-                        userPreferences.delete(chatId);
-                        subreddit = null;
-                    } else if (subreddit) {
-                        userPreferences.set(chatId, subreddit);
+                        // Use stored preferences for subreddit if available
+                        targetSubreddit = userPref.defaultSubreddit || null;
+                    } else {
+                        targetSubreddit = subreddit;
                     }
 
-                    const targetSubreddit = subreddit || userPreferences.get(chatId);
-                    const meme = await getMemeFromReddit(targetSubreddit);
-                    await sendMemeWithKeyboard(bot, chatId, meme, targetSubreddit);
+                    // Use stored media type preference if available
+                    if (userPref.defaultMediaType) {
+                        if (userPref.defaultMediaType === 'random') {
+                            mediaType = Math.random() < 0.5 ? 'pics' : 'vids';
+                        } else {
+                            mediaType = userPref.defaultMediaType;
+                        }
+                    }
+
+                    const meme = await getMemeFromReddit(targetSubreddit, mediaType);
+                    await sendMemeWithKeyboard(bot, chatId, meme, targetSubreddit, mediaType);
                     
                 } finally {
                     clearInterval(actionInterval);
