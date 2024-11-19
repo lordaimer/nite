@@ -136,3 +136,4 @@ src/config/ecosystem.config.cjs
 src/services/data/subscriptions.json
 src/services/data/bugs.json
 temp
+src/commands/data/botState.json

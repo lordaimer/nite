@@ -151,6 +151,14 @@ I am a versatile personal assistant bot currently under development.`;
             note: '\nUse the interactive buttons to refine your recommendations.'
         },
         {
+            command: '/extract, /ext',
+            description: 'Extract and send files from a ZIP archive',
+            usage: '/extract',
+            examples: ['/extract', '/ext'],
+            category: 'Utilities',
+            note: '\nSend a ZIP file after using this command. You can choose to send all files or select specific ones.'
+        },
+        {
             command: '/subscribe, /sub',
             description: 'Subscribe to any of the media commands: /meme, /facts, /joke, /quote',
             usage: '/subscribe',
