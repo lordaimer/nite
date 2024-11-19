@@ -14,27 +14,25 @@ async function getSuggestions(query) {
     
     try {
         const response = await llmService.generateResponse(prompt);
-        // Parse the response as JSON array
-        const suggestions = JSON.parse(response.trim());
-        return suggestions.slice(0, 4); // Limit to 4 suggestions
+        return JSON.parse(response);
     } catch (error) {
-        console.error('Error getting suggestions:', error);
+        console.error('Error generating suggestions:', error);
         return null;
     }
 }
 
 async function formatDescription(description) {
-    if (!description) return 'No description available';
-    
-    const prompt = `Summarize this game description in 1-2 concise sentences, keeping the most important information:
-    "${description}"`;
-    
+    if (!description) {
+        return 'No description available.';
+    }
+
     try {
-        const summary = await llmService.generateResponse(prompt);
-        return summary.trim();
+        const prompt = `Summarize this game description in one short sentence, preserving the most important gameplay and story elements: "${description}"`;
+        const response = await llmService.generateResponse(prompt);
+        return response.trim();
     } catch (error) {
-        // Fallback to basic formatting if LLM fails
-        const sentences = description.match(/[^.!?]+[.!?]+/g) || [description];
+        // Fallback to first sentence if AI summarization fails
+        const sentences = description.split(/[.!?]+/);
         let result = sentences[0] || description;
         return result.trim();
     }
@@ -46,12 +44,11 @@ async function fetchGameInfo(query) {
             params: {
                 key: RAWG_API_KEY,
                 search: query,
-                page_size: 5  // Get a few results to check for exact matches
+                page_size: 5
             }
         });
 
         if (!searchResponse.data.results || searchResponse.data.results.length === 0) {
-            // Get suggestions when no games found
             const suggestions = await getSuggestions(query);
             if (suggestions && suggestions.length > 0) {
                 throw new Error('SUGGEST_GAMES:' + JSON.stringify(suggestions));
@@ -59,14 +56,12 @@ async function fetchGameInfo(query) {
             throw new Error('Game not found');
         }
 
-        // Check for exact match (case insensitive)
         const exactMatch = searchResponse.data.results.find(game => 
             game.name.toLowerCase() === query.toLowerCase() ||
             game.name.toLowerCase().replace(/[^a-z0-9\s]/g, '') === query.toLowerCase().replace(/[^a-z0-9\s]/g, '')
         );
 
         if (!exactMatch) {
-            // No exact match found, get suggestions including the top results
             const topResults = searchResponse.data.results.slice(0, 3).map(game => game.name);
             const suggestions = await getSuggestions(query);
             const combinedSuggestions = [...new Set([...topResults, ...(suggestions || [])])].slice(0, 4);
@@ -77,9 +72,27 @@ async function fetchGameInfo(query) {
             throw new Error('Game not found');
         }
 
+        // Fetch game details
         const gameResponse = await axios.get(`${RAWG_BASE_URL}/games/${exactMatch.id}`, {
             params: { key: RAWG_API_KEY }
         });
+
+        // Fetch game screenshots
+        try {
+            const mediaResponse = await axios.get(`${RAWG_BASE_URL}/games/${exactMatch.id}/screenshots`, {
+                params: { key: RAWG_API_KEY }
+            });
+            
+            if (mediaResponse.data.results && mediaResponse.data.results.length > 0) {
+                // Get up to 4 screenshots
+                gameResponse.data.screenshots = mediaResponse.data.results
+                    .filter(item => !item.is_deleted)
+                    .slice(0, 4)
+                    .map(item => item.image);
+            }
+        } catch (error) {
+            console.log('No screenshots found for the game:', error.message);
+        }
 
         return gameResponse.data;
     } catch (error) {
@@ -89,6 +102,7 @@ async function fetchGameInfo(query) {
         if (error.response?.status === 404) {
             throw new Error('Game not found');
         }
+        console.error('API Error:', error.response?.data || error.message);
         throw new Error('Failed to fetch game information');
     }
 }
@@ -99,7 +113,6 @@ async function formatGameInfo(game) {
     const developers = game.developers?.map(d => d.name).join(', ') || 'N/A';
     const publishers = game.publishers?.map(p => p.name).join(', ') || 'N/A';
     
-    // Get AI-generated concise description
     const description = await formatDescription(game.description_raw);
 
     const basicInfo = `🎮 𝖳𝗂𝗍𝗅𝖾 : <a href="${rawgUrl}">${game.name}</a>
@@ -113,112 +126,139 @@ async function formatGameInfo(game) {
 
 📝 𝖣𝖾𝗌𝖼𝗋𝗂𝗉𝗍𝗂𝗈𝗇 : <code>${description}</code>`;
 
-    return basicInfo;
+    return {
+        text: basicInfo,
+        media: {
+            screenshots: game.screenshots || [],
+            mainBanner: game.background_image
+        }
+    };
 }
 
 async function sendGameInfo(bot, chatId, gameInfo, messageId = null) {
     try {
-        const formattedInfo = await formatGameInfo(gameInfo);
-        const options = {
-            parse_mode: 'HTML',
-            ...(messageId && { message_id: messageId })
-        };
+        const { text, media } = await formatGameInfo(gameInfo);
         
-        if (gameInfo.background_image) {
-            if (messageId) {
-                // Edit existing message with photo
-                await bot.editMessageMedia({
+        // Prepare media group
+        const mediaGroup = [];
+        
+        // Add main banner with caption
+        if (media.mainBanner) {
+            mediaGroup.push({
+                type: 'photo',
+                media: media.mainBanner,
+                caption: text,
+                parse_mode: 'HTML'
+            });
+        }
+
+        // Add additional screenshots
+        if (media.screenshots && media.screenshots.length > 0) {
+            media.screenshots.forEach(screenshot => {
+                mediaGroup.push({
                     type: 'photo',
-                    media: gameInfo.background_image,
-                    caption: formattedInfo,
-                    parse_mode: 'HTML'
-                }, {
+                    media: screenshot
+                });
+            });
+        }
+
+        if (messageId) {
+            // Delete the searching message
+            await bot.deleteMessage(chatId, messageId);
+        }
+
+        if (mediaGroup.length > 0) {
+            // Send media group with all content
+            await bot.sendMediaGroup(chatId, mediaGroup);
+        } else {
+            // Fallback to text-only message if no media available
+            await bot.sendMessage(chatId, text, {
+                parse_mode: 'HTML'
+            });
+        }
+
+    } catch (error) {
+        console.error('Error sending game info:', error);
+        if (error.message.startsWith('SUGGEST_GAMES:')) {
+            const suggestions = JSON.parse(error.message.replace('SUGGEST_GAMES:', ''));
+            const suggestionText = 'Game not found. Did you mean:\n' + 
+                suggestions.map((s, i) => `${i + 1}. ${s}`).join('\n');
+            
+            if (messageId) {
+                await bot.editMessageText(suggestionText, {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    reply_markup: {
+                        inline_keyboard: suggestions.map(game => [{
+                            text: game,
+                            callback_data: `game_suggest:${game}`
+                        }])
+                    }
+                });
+            } else {
+                await bot.sendMessage(chatId, suggestionText);
+            }
+        } else {
+            const errorMessage = '❌ Error fetching game information. Please try again later.';
+            if (messageId) {
+                await bot.editMessageText(errorMessage, {
                     chat_id: chatId,
                     message_id: messageId
                 });
             } else {
-                // Send new message with photo
-                await bot.sendPhoto(chatId, gameInfo.background_image, {
-                    caption: formattedInfo,
-                    parse_mode: 'HTML'
-                });
-            }
-        } else {
-            if (messageId) {
-                // Edit existing message text
-                await bot.editMessageText(formattedInfo, {
-                    chat_id: chatId,
-                    message_id: messageId,
-                    parse_mode: 'HTML'
-                });
-            } else {
-                // Send new message text
-                await bot.sendMessage(chatId, formattedInfo, {
-                    parse_mode: 'HTML'
-                });
+                await bot.sendMessage(chatId, errorMessage);
             }
         }
+    }
+}
+
+async function handleCommand(bot, msg, args) {
+    if (!args || args.length === 0) {
+        await bot.sendMessage(msg.chat.id, 'Please provide a game name to search for.');
+        return;
+    }
+
+    const query = args.join(' ');
+    const searchingMsg = await bot.sendMessage(msg.chat.id, '🔍 Searching for game...');
+
+    try {
+        const cacheKey = query.toLowerCase();
+        const cachedResult = gameCache.get(cacheKey);
+        
+        if (cachedResult && (Date.now() - cachedResult.timestamp) < CACHE_DURATION) {
+            await sendGameInfo(bot, msg.chat.id, cachedResult.data, searchingMsg.message_id);
+            return;
+        }
+
+        const gameInfo = await fetchGameInfo(query);
+        gameCache.set(cacheKey, {
+            data: gameInfo,
+            timestamp: Date.now()
+        });
+
+        await sendGameInfo(bot, msg.chat.id, gameInfo, searchingMsg.message_id);
     } catch (error) {
-        throw new Error('Failed to send game information');
+        if (error.message.startsWith('SUGGEST_GAMES:')) {
+            const suggestions = JSON.parse(error.message.replace('SUGGEST_GAMES:', ''));
+            const suggestionText = '🎮 Game not found. Did you mean:\n\n' + 
+                suggestions.map((game, index) => `${index + 1}. ${game}`).join('\n');
+            
+            // Delete searching message and send suggestions
+            await bot.deleteMessage(msg.chat.id, searchingMsg.message_id);
+            await bot.sendMessage(msg.chat.id, suggestionText);
+            return;
+        }
+
+        // Delete searching message and send error
+        await bot.deleteMessage(msg.chat.id, searchingMsg.message_id);
+        await bot.sendMessage(msg.chat.id, '❌ ' + (error.message || 'An error occurred while fetching game information.'));
     }
 }
 
 export function setupGameCommand(bot) {
     // Handler for /gameinfo and /gs commands
     bot.onText(/^\/(?:gameinfo|gs)(?:@\w+)? (.+)/, async (msg, match) => {
-        const chatId = msg.chat.id;
-        const query = match[1];
-
-        try {
-            const cacheKey = query.toLowerCase();
-            const cachedResult = gameCache.get(cacheKey);
-            
-            if (cachedResult && (Date.now() - cachedResult.timestamp) < CACHE_DURATION) {
-                await sendGameInfo(bot, chatId, cachedResult.data);
-                return;
-            }
-
-            const searchingMsg = await bot.sendMessage(
-                chatId,
-                `🔍 Searching for game: "${query}"...`
-            );
-
-            const gameInfo = await fetchGameInfo(query);
-            gameCache.set(cacheKey, {
-                data: gameInfo,
-                timestamp: Date.now()
-            });
-
-            await sendGameInfo(bot, chatId, gameInfo, searchingMsg.message_id);
-        } catch (error) {
-            if (error.message.startsWith('SUGGEST_GAMES:')) {
-                const suggestions = JSON.parse(error.message.replace('SUGGEST_GAMES:', ''));
-                const buttons = suggestions.map(game => [{
-                    text: game,
-                    callback_data: `game_suggest:${game}`
-                }]);
-                
-                await bot.editMessageText(
-                    `❌ Game not found: "${query}"\n\n💡 Did you mean:`,
-                    {
-                        chat_id: chatId,
-                        message_id: searchingMsg.message_id,
-                        reply_markup: {
-                            inline_keyboard: buttons
-                        }
-                    }
-                );
-            } else {
-                await bot.editMessageText(
-                    `❌ ${error.message}`,
-                    {
-                        chat_id: chatId,
-                        message_id: searchingMsg.message_id,
-                        parse_mode: 'HTML'
-                    }
-                );
-            }
-        }
+        await handleCommand(bot, msg, match[1].split(' '));
     });
 
     // Handler for game suggestions callback
