@@ -297,7 +297,10 @@ export function setupExtractCommand(bot, limit) {
                 show_alert: false
             });
         } else if (data.startsWith('ext_done_')) {
-            const [_, fileCount, folderCount] = data.split('_');
+            // Extract numbers after 'ext_done_'
+            const counts = data.substring('ext_done_'.length).split('_');
+            const fileCount = counts[0];
+            const folderCount = counts[1];
             
             await bot.editMessageText(
                 `File extraction complete:\nTotal extracted: ${fileCount} files, ${folderCount} folders`,
@@ -313,98 +316,98 @@ export function setupExtractCommand(bot, limit) {
             userStates.delete(chatId);
         }
     });
-}
 
-/**
- * Shows the file list for the current directory
- */
-async function showFileList(bot, chatId, messageId, userState) {
-    const currentPath = userState.currentPath;
-    console.log(`[DEBUG] Showing files for path: ${currentPath}`);
+    async function showFileList(bot, chatId, messageId, userState) {
+        const currentPath = userState.currentPath;
+        console.log(`[DEBUG] Showing files for path: ${currentPath}`);
 
-    // Filter files for current directory
-    const filesInDir = userState.extractedFiles.filter(file => {
-        if (!currentPath) {
-            // In root directory, show only root level files/folders
-            return !file.path.includes('/');
-        } else {
-            // In subdirectory, show only direct children
-            const relativePath = path.relative(currentPath, file.path);
-            return relativePath && !relativePath.includes('/') && file.path.startsWith(currentPath + '/');
+        // Calculate total counts from all extracted files
+        const totalFiles = userState.extractedFiles.filter(f => !f.isDir).length;
+        const totalFolders = userState.extractedFiles.filter(f => f.isDir).length;
+
+        // Filter files for current directory
+        const filesInDir = userState.extractedFiles.filter(file => {
+            if (!currentPath) {
+                return !file.path.includes('/');
+            } else {
+                const relativePath = path.relative(currentPath, file.path);
+                return relativePath && !relativePath.includes('/') && file.path.startsWith(currentPath + '/');
+            }
+        });
+
+        // Separate directories and files in current directory
+        const directories = filesInDir.filter(f => f.isDir);
+        const files = filesInDir.filter(f => !f.isDir);
+
+        // Create keyboard buttons, directories first then files
+        const directoryButtons = directories.map(dir => ([{
+            text: `📁 ${path.basename(dir.path)}`,
+            callback_data: `ext_file_${dir.path}`
+        }]));
+
+        const fileButtons = files.map(file => ([{
+            text: `📄 ${path.basename(file.path)}`,
+            callback_data: `ext_file_${file.path}`
+        }]));
+
+        // Add navigation buttons
+        const navButtons = [];
+        if (currentPath) {
+            navButtons.push({
+                text: '⬅️ Back',
+                callback_data: 'ext_back'
+            });
         }
-    });
-
-    // Separate directories and files
-    const directories = filesInDir.filter(f => f.isDir);
-    const files = filesInDir.filter(f => !f.isDir);
-
-    // Create keyboard buttons, directories first then files
-    const directoryButtons = directories.map(dir => ([{
-        text: `📁 ${path.basename(dir.path)}`,
-        callback_data: `ext_file_${dir.path}`
-    }]));
-
-    const fileButtons = files.map(file => ([{
-        text: `📄 ${path.basename(file.path)}`,
-        callback_data: `ext_file_${file.path}`
-    }]));
-
-    // Add navigation buttons
-    const navButtons = [];
-    if (currentPath) {
         navButtons.push({
-            text: '⬅️ Back',
-            callback_data: 'ext_back'
+            text: '✅ Done',
+            callback_data: `ext_done_${totalFiles}_${totalFolders}`
+        });
+
+        const keyboard = {
+            inline_keyboard: [
+                ...directoryButtons,
+                ...fileButtons,
+                navButtons
+            ]
+        };
+
+        // Create message text with current path and total counts
+        let messageText = 'Select files to send:\n';
+        if (currentPath) {
+            messageText += `📁 Current folder: ${currentPath}\n`;
+            messageText += `Files in current folder: ${files.length} files, ${directories.length} folders\n`;
+        }
+        messageText += `Total extracted: ${totalFiles} files, ${totalFolders} folders`;
+
+        await bot.editMessageText(messageText, {
+            chat_id: chatId,
+            message_id: messageId,
+            reply_markup: keyboard
         });
     }
-    navButtons.push({
-        text: '✅ Done',
-        callback_data: `ext_done_${files.length}_${directories.length}`
-    });
 
-    const keyboard = {
-        inline_keyboard: [
-            ...directoryButtons,  // Directories first
-            ...fileButtons,       // Files second
-            navButtons           // Navigation row at the bottom
-        ]
-    };
-
-    // Create message text with current path and counts
-    let messageText = 'Select files to send:\n';
-    if (currentPath) {
-        messageText += `📁 Current folder: ${currentPath}\n`;
-    }
-    messageText += `Total in current folder: ${files.length} files, ${directories.length} folders`;
-
-    await bot.editMessageText(messageText, {
-        chat_id: chatId,
-        message_id: messageId,
-        reply_markup: keyboard
-    });
-}
-
-function formatFileSize(size) {
-    if (size < 1024) return `${size} bytes`;
-    if (size < 1024 * 1024) return `${(size / 1024).toFixed(2)} KB`;
-    if (size < 1024 * 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(2)} MB`;
-    return `${(size / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
-
-function cleanupExtractedFiles(userState) {
-    if (!userState.extractPath) {
-        console.log('[DEBUG] No extraction path to clean up');
-        return;
+    function formatFileSize(size) {
+        if (size < 1024) return `${size} bytes`;
+        if (size < 1024 * 1024) return `${(size / 1024).toFixed(2)} KB`;
+        if (size < 1024 * 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+        return `${(size / (1024 * 1024 * 1024)).toFixed(2)} GB`;
     }
 
-    const extractPath = userState.extractPath;
-    console.log(`[DEBUG] Cleaning up extracted files at: ${extractPath}`);
+    function cleanupExtractedFiles(userState) {
+        if (!userState.extractPath) {
+            console.log('[DEBUG] No extraction path to clean up');
+            return;
+        }
 
-    try {
-        // Use recursive deletion for the entire directory
-        fs.rmSync(extractPath, { recursive: true, force: true });
-        console.log(`[DEBUG] Successfully cleaned up directory: ${extractPath}`);
-    } catch (error) {
-        console.error(`[DEBUG] Error during cleanup: ${error.message}`);
+        const extractPath = userState.extractPath;
+        console.log(`[DEBUG] Cleaning up extracted files at: ${extractPath}`);
+
+        try {
+            // Use recursive deletion for the entire directory
+            fs.rmSync(extractPath, { recursive: true, force: true });
+            console.log(`[DEBUG] Successfully cleaned up directory: ${extractPath}`);
+        } catch (error) {
+            console.error(`[DEBUG] Error during cleanup: ${error.message}`);
+        }
     }
 }
