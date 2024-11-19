@@ -196,10 +196,9 @@ export function setupExtractCommand(bot, limit) {
                         const fileStream = fs.createReadStream(fullPath);
                         const stats = fs.statSync(fullPath);
 
-                        // Send as document with original filename
+                        // Send document without caption
                         await bot.sendDocument(chatId, fileStream, {
-                            filename: path.basename(file.path),
-                            caption: `File: ${file.path}\nSize: ${formatFileSize(stats.size)}`
+                            filename: path.basename(file.path)
                         });
 
                         successCount++;
@@ -269,10 +268,9 @@ export function setupExtractCommand(bot, limit) {
                     const fileStream = fs.createReadStream(fullPath);
                     const stats = fs.statSync(fullPath);
 
-                    // Send as document with original filename
+                    // Send document without caption
                     await bot.sendDocument(chatId, fileStream, {
-                        filename: path.basename(filePath),
-                        caption: `File: ${filePath}\nSize: ${formatFileSize(stats.size)}`
+                        filename: path.basename(filePath)
                     });
 
                     console.log(`[DEBUG] Successfully sent: ${filePath}`);
@@ -336,13 +334,18 @@ async function showFileList(bot, chatId, messageId, userState) {
         }
     });
 
-    // Count files and folders in current directory
-    const fileCount = filesInDir.filter(f => !f.isDir).length;
-    const folderCount = filesInDir.filter(f => f.isDir).length;
+    // Separate directories and files
+    const directories = filesInDir.filter(f => f.isDir);
+    const files = filesInDir.filter(f => !f.isDir);
 
-    // Create keyboard buttons for files and folders
-    const fileButtons = filesInDir.map(file => ([{
-        text: `${file.isDir ? '📁' : '📄'} ${path.basename(file.path)}`,
+    // Create keyboard buttons, directories first then files
+    const directoryButtons = directories.map(dir => ([{
+        text: `📁 ${path.basename(dir.path)}`,
+        callback_data: `ext_file_${dir.path}`
+    }]));
+
+    const fileButtons = files.map(file => ([{
+        text: `📄 ${path.basename(file.path)}`,
         callback_data: `ext_file_${file.path}`
     }]));
 
@@ -356,13 +359,14 @@ async function showFileList(bot, chatId, messageId, userState) {
     }
     navButtons.push({
         text: '✅ Done',
-        callback_data: `ext_done_${fileCount}_${folderCount}`
+        callback_data: `ext_done_${files.length}_${directories.length}`
     });
 
     const keyboard = {
         inline_keyboard: [
-            ...fileButtons,
-            navButtons // Navigation row at the bottom
+            ...directoryButtons,  // Directories first
+            ...fileButtons,       // Files second
+            navButtons           // Navigation row at the bottom
         ]
     };
 
@@ -371,7 +375,7 @@ async function showFileList(bot, chatId, messageId, userState) {
     if (currentPath) {
         messageText += `📁 Current folder: ${currentPath}\n`;
     }
-    messageText += `Total in current folder: ${fileCount} files, ${folderCount} folders`;
+    messageText += `Total in current folder: ${files.length} files, ${directories.length} folders`;
 
     await bot.editMessageText(messageText, {
         chat_id: chatId,
@@ -388,23 +392,19 @@ function formatFileSize(size) {
 }
 
 function cleanupExtractedFiles(userState) {
-    const extractPath = userState.extractPath;
-    const files = userState.extractedFiles;
-
-    for (const file of files) {
-        if (file.isDir) continue; // Skip directories
-
-        const fullPath = path.join(extractPath, file.path);
-        try {
-            fs.unlinkSync(fullPath);
-        } catch (error) {
-            console.error(`[DEBUG] Error deleting file ${file.path}:`, error);
-        }
+    if (!userState.extractPath) {
+        console.log('[DEBUG] No extraction path to clean up');
+        return;
     }
 
+    const extractPath = userState.extractPath;
+    console.log(`[DEBUG] Cleaning up extracted files at: ${extractPath}`);
+
     try {
-        fs.rmdirSync(extractPath);
+        // Use recursive deletion for the entire directory
+        fs.rmSync(extractPath, { recursive: true, force: true });
+        console.log(`[DEBUG] Successfully cleaned up directory: ${extractPath}`);
     } catch (error) {
-        console.error(`[DEBUG] Error deleting directory ${extractPath}:`, error);
+        console.error(`[DEBUG] Error during cleanup: ${error.message}`);
     }
 }
