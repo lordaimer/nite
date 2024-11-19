@@ -67,14 +67,12 @@ export function setupExtractCommand(bot, limit) {
             console.log(`[DEBUG] File size: ${file.file_size} bytes`);
             console.log(`[DEBUG] MIME type: ${file.mime_type}`);
 
-            // Update message to show processing status
-            await bot.editMessageText(
-                'Processing your ZIP file...',
-                {
-                    chat_id: chatId,
-                    message_id: userState.messageId
-                }
+            // Send a new processing message
+            const processingMsg = await bot.sendMessage(
+                chatId,
+                'Processing your ZIP file...'
             );
+            userState.messageId = processingMsg.message_id;
 
             // Download the file
             console.log('[DEBUG] Initiating file download');
