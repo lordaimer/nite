@@ -25,7 +25,8 @@ import {
     setupBugCommand,
     setupQuoteCommand,
     setupWhatToWatchCommand,
-    setupTruthOrDareCommand
+    setupTruthOrDareCommand,
+    setupExtractCommand
 } from './commands/index.js';
 
 // Import services
@@ -97,7 +98,8 @@ function setupCommandsWithRateLimits() {
         { setup: setupBugCommand, name: 'bug' },
         { setup: setupDownloadCommand, name: 'download' },
         { setup: setupWhatToWatchCommand, name: 'whattowatch' },
-        { setup: setupTruthOrDareCommand, name: 'truthordare' }
+        { setup: setupTruthOrDareCommand, name: 'truthordare' },
+        { setup: setupExtractCommand, name: 'extract' }
     ];
 
     const commandLimits = {
@@ -107,6 +109,7 @@ function setupCommandsWithRateLimits() {
         movie: { requests: 10, window: 60000 },
         voice: { requests: 3, window: 60000 },
         whattowatch: { requests: 10, window: 60000 },
+        extract: { requests: 5, window: 60000 },
         default: { requests: 15, window: 60000 }
     };
 

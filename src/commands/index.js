@@ -22,3 +22,4 @@ export { setupTranslateCommand } from './utility/translateCommand.js';
 export { setupBugCommand } from './utility/bugCommand.js';
 export { setupQuoteCommand } from './utility/quoteCommand.js';
 export { setupTruthOrDareCommand } from './utility/truthOrDareCommand.js';
+export { setupExtractCommand } from './utility/extract.js';
