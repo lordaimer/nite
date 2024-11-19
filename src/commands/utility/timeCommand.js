@@ -8,7 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Read and parse JSON file
 const timezoneMappings = JSON.parse(
-    readFileSync(join(__dirname, '../data/timezones.json'), 'utf8')
+    readFileSync(join(__dirname, '../../data/timezones.json'), 'utf8')
 );
 
 // Store active time updates

@@ -11,8 +11,8 @@ const __dirname = dirname(__filename);
 let MEME_SUBREDDITS;
 let VIDEO_SUBREDDITS;
 try {
-    const jsonData = readFileSync(join(__dirname, '../data/memeSubreddits.json'), 'utf8');
-    const videoJsonData = readFileSync(join(__dirname, '../data/memeVideoSubreddits.json'), 'utf8');
+    const jsonData = readFileSync(join(__dirname, '../../data/memeSubreddits.json'), 'utf8');
+    const videoJsonData = readFileSync(join(__dirname, '../../data/memeVideoSubreddits.json'), 'utf8');
     MEME_SUBREDDITS = JSON.parse(jsonData).subreddits;
     VIDEO_SUBREDDITS = JSON.parse(videoJsonData).subreddits;
 } catch (error) {

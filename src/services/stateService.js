@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const STATE_FILE = path.join(__dirname, '..', 'commands', 'data', 'botState.json');
+const STATE_FILE = path.join(__dirname, '..', 'data', 'botState.json');
 
 class StateService {
     constructor() {

@@ -13,7 +13,7 @@ const __dirname = dirname(__filename);
 // Read stopwords from JSON file
 const stopwordsData = JSON.parse(
     readFileSync(
-        join(__dirname, '..', 'data', 'stopwords.json'),
+        join(__dirname, '../../data/stopwords.json'),
         'utf8'
     )
 );
@@ -145,12 +145,12 @@ async function getFact(category = '') {
 }
 
 const categories = [
-    { text: '🎲 Random', callback_data: 'fact_random' },
-    { text: '🧪 Science', callback_data: 'fact_science' },
-    { text: '🐾 Animals', callback_data: 'fact_animals' },
-    { text: '⌛ History', callback_data: 'fact_history' },
-    { text: '🎭 Art', callback_data: 'fact_art' },
-    { text: '🌏 Culture', callback_data: 'fact_culture' }
+    { text: ' Random', callback_data: 'fact_random' },
+    { text: ' Science', callback_data: 'fact_science' },
+    { text: ' Animals', callback_data: 'fact_animals' },
+    { text: ' History', callback_data: 'fact_history' },
+    { text: ' Art', callback_data: 'fact_art' },
+    { text: ' Culture', callback_data: 'fact_culture' }
 ];
 
 function getCategoryKeyboard() {
@@ -170,8 +170,8 @@ function getFactKeyboard(category) {
         reply_markup: {
             inline_keyboard: [
                 [
-                    { text: '🔄 Another Fact', callback_data: `fact_${category}` },
-                    { text: '📚 Change Category', callback_data: 'fact_categories' }
+                    { text: ' Another Fact', callback_data: `fact_${category}` },
+                    { text: ' Change Category', callback_data: 'fact_categories' }
                 ]
             ]
         }
@@ -216,7 +216,7 @@ export function setupFactCommand(bot) {
             }
 
             // For fetching new facts
-            const loadingMsg = await bot.sendMessage(chatId, '🔄 Fetching an interesting fact...');
+            const loadingMsg = await bot.sendMessage(chatId, ' Fetching an interesting fact...');
             await bot.deleteMessage(chatId, messageId); // Delete the previous fact
 
             const { fact, imageUrl } = await getFact(category === 'random' ? '' : category);
@@ -249,7 +249,7 @@ export function setupFactCommand(bot) {
             
             await bot.sendMessage(
                 chatId,
-                '❌ Sorry, something went wrong. Please try again.',
+                ' Sorry, something went wrong. Please try again.',
                 getCategoryKeyboard()
             );
         }

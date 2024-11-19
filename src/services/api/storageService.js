@@ -6,7 +6,7 @@ import { EventEmitter } from 'events';
 import moment from 'moment-timezone';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, '../data');
+const DATA_DIR = path.join(__dirname, '../../data');
 const STORAGE_PATH = path.join(DATA_DIR, 'subscriptions.json');
 const BUGS_PATH = path.join(DATA_DIR, 'bugs.json');
 const subscriptionEmitter = new EventEmitter();
@@ -66,7 +66,7 @@ class StorageService {
         
         this.loadSubscriptions();
 
-        const oldPath = path.join(__dirname, '../../commands/data/subscriptions.json');
+        const oldPath = path.join(__dirname, '../../../commands/data/subscriptions.json');
         if (fs.existsSync(oldPath)) {
             try {
                 const oldData = JSON.parse(fs.readFileSync(oldPath, 'utf8'));
