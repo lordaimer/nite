@@ -62,12 +62,6 @@ export function setupExtractCommand(bot, limit) {
         const fileId = file.file_id;
 
         try {
-            console.log(`[DEBUG] Starting extraction process for file: ${file.file_name}`);
-            console.log(`[DEBUG] File ID: ${fileId}`);
-            console.log(`[DEBUG] File size: ${file.file_size} bytes`);
-            console.log(`[DEBUG] MIME type: ${file.mime_type}`);
-
-            // Send a new processing message
             const processingMsg = await bot.sendMessage(
                 chatId,
                 'Processing your ZIP file...'
@@ -75,41 +69,27 @@ export function setupExtractCommand(bot, limit) {
             userState.messageId = processingMsg.message_id;
 
             // Download the file
-            console.log('[DEBUG] Initiating file download');
             const filePath = await downloadFile(bot, fileId);
-            console.log(`[DEBUG] File downloaded to: ${filePath}`);
-
             const downloadDir = path.dirname(filePath);
-            console.log(`[DEBUG] Download directory: ${downloadDir}`);
-
-            console.log('[DEBUG] Reading file for validation');
             const fileBuffer = fs.readFileSync(filePath);
-            console.log(`[DEBUG] File read, size: ${fileBuffer.length} bytes`);
             
             try {
                 // Verify if it's a ZIP file
-                console.log('[DEBUG] Checking file type');
                 const fileType = await fileTypeFromBuffer(fileBuffer);
-                console.log(`[DEBUG] File type detected:`, fileType);
 
                 if (!fileType || fileType.mime !== 'application/zip') {
                     throw new Error('The file you sent is not a ZIP file.');
                 }
 
                 // Create temp directory for extraction
-                console.log('[DEBUG] Creating extraction directory');
                 const extractPath = await createTempDir();
-                console.log(`[DEBUG] Extraction path: ${extractPath}`);
                 userState.extractPath = extractPath;
 
                 // Extract the ZIP file
-                console.log('[DEBUG] Starting ZIP extraction');
                 const zip = new AdmZip(filePath);
                 zip.extractAllTo(extractPath, true);
-                console.log('[DEBUG] ZIP extraction completed');
 
                 // Get list of extracted files
-                console.log('[DEBUG] Scanning extracted files');
                 const extractedFiles = [];
                 const processDirectory = (dir, prefix = '') => {
                     const items = fs.readdirSync(dir);
@@ -126,7 +106,6 @@ export function setupExtractCommand(bot, limit) {
                     }
                 };
                 processDirectory(extractPath);
-                console.log(`[DEBUG] Found ${extractedFiles.length} files/folders`);
                 userState.extractedFiles = extractedFiles;
 
                 // Show success message with options
@@ -138,12 +117,10 @@ export function setupExtractCommand(bot, limit) {
             } finally {
                 // Cleanup the downloaded zip file and its directory
                 try {
-                    console.log('[DEBUG] Cleaning up downloaded file');
                     fs.unlinkSync(filePath);
                     fs.rmdirSync(downloadDir);
-                    console.log('[DEBUG] Cleanup completed');
                 } catch (error) {
-                    console.error('[DEBUG] Error during cleanup:', error);
+                    console.error('Error during cleanup:', error);
                 }
             }
 
@@ -187,7 +164,6 @@ export function setupExtractCommand(bot, limit) {
                     if (file.isDir) continue; // Skip directories
 
                     const fullPath = path.join(extractPath, file.path);
-                    console.log(`[DEBUG] Sending file: ${fullPath}`);
 
                     try {
                         // Create a read stream for the file
@@ -200,9 +176,8 @@ export function setupExtractCommand(bot, limit) {
                         });
 
                         successCount++;
-                        console.log(`[DEBUG] Successfully sent: ${file.path}`);
                     } catch (error) {
-                        console.error(`[DEBUG] Error sending file ${file.path}:`, error);
+                        console.error(`Error sending file ${file.path}:`, error);
                         errorCount++;
                     }
                 }
@@ -222,7 +197,7 @@ export function setupExtractCommand(bot, limit) {
                 );
 
             } catch (error) {
-                console.error('[DEBUG] Error in send all:', error);
+                console.error('Error in send all:', error);
                 await bot.editMessageText(
                     '❌ Error sending files: ' + error.message,
                     {
@@ -260,7 +235,6 @@ export function setupExtractCommand(bot, limit) {
 
                 try {
                     const fullPath = path.join(userState.extractPath, filePath);
-                    console.log(`[DEBUG] Sending individual file: ${fullPath}`);
 
                     // Create a read stream for the file
                     const fileStream = fs.createReadStream(fullPath);
@@ -271,13 +245,12 @@ export function setupExtractCommand(bot, limit) {
                         filename: path.basename(filePath)
                     });
 
-                    console.log(`[DEBUG] Successfully sent: ${filePath}`);
                     await bot.answerCallbackQuery(query.id, {
                         text: '✅ File sent!',
                         show_alert: false
                     });
                 } catch (error) {
-                    console.error(`[DEBUG] Error sending file ${filePath}:`, error);
+                    console.error(`Error sending file ${filePath}:`, error);
                     await bot.answerCallbackQuery(query.id, {
                         text: '❌ Failed to send file: ' + error.message,
                         show_alert: true
@@ -317,7 +290,6 @@ export function setupExtractCommand(bot, limit) {
 
     async function showFileList(bot, chatId, messageId, userState) {
         const currentPath = userState.currentPath;
-        console.log(`[DEBUG] Showing files for path: ${currentPath}`);
 
         // Calculate total counts from all extracted files
         const totalFiles = userState.extractedFiles.filter(f => !f.isDir).length;
@@ -393,19 +365,18 @@ export function setupExtractCommand(bot, limit) {
 
     function cleanupExtractedFiles(userState) {
         if (!userState.extractPath) {
-            console.log('[DEBUG] No extraction path to clean up');
+            console.log('No extraction path to clean up');
             return;
         }
 
         const extractPath = userState.extractPath;
-        console.log(`[DEBUG] Cleaning up extracted files at: ${extractPath}`);
 
         try {
             // Use recursive deletion for the entire directory
             fs.rmSync(extractPath, { recursive: true, force: true });
-            console.log(`[DEBUG] Successfully cleaned up directory: ${extractPath}`);
+            console.log(`Successfully cleaned up directory: ${extractPath}`);
         } catch (error) {
-            console.error(`[DEBUG] Error during cleanup: ${error.message}`);
+            console.error(`Error during cleanup: ${error.message}`);
         }
     }
 }
