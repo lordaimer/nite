@@ -30,28 +30,12 @@ const lastMemeMessages = new Map(); // Stores the last meme message ID for each 
 // Track shared memes with all necessary details
 const sharedMemes = new Map(); // messageId -> { fromId, toId, memeData }
 
-// Add this constant for reaction buttons
-const REACTIONS = {
-    HILARIOUS: { emoji: '🤣' },
-    LOVE: { emoji: '❤' },
-    FIRE: { emoji: '' },
-    DEAD: { emoji: '💀' },
-    MEH: { emoji: '😐' }
-};
+// Track sent memes and their original senders
+const sentMemes = new Map();
 
-// Add function to create reaction keyboard
-const getReactionKeyboard = () => {
-    return {
-        inline_keyboard: [
-            Object.entries(REACTIONS).map(([key, value]) => ({
-                text: value.emoji,
-                callback_data: `reaction_${key}`
-            }))
-        ]
-    };
-};
-
-const SORT_TYPE = 'hot'; // default sort type
+// Reddit sort types and time periods
+const SORT_TYPES = ['hot', 'top', 'new'];
+const TIME_PERIODS = ['hour', 'day', 'week', 'month', 'year', 'all'];
 
 async function getMemeFromReddit(subreddit = null, mediaType = 'pics') {
     try {
@@ -63,7 +47,15 @@ async function getMemeFromReddit(subreddit = null, mediaType = 'pics') {
         }
 
         const randomSubreddit = targetSubreddits[Math.floor(Math.random() * targetSubreddits.length)];
-        const response = await axios.get(`https://www.reddit.com/r/${randomSubreddit}/${SORT_TYPE}.json?limit=100`);
+        const randomSort = SORT_TYPES[Math.floor(Math.random() * SORT_TYPES.length)];
+        
+        let url = `https://www.reddit.com/r/${randomSubreddit}/${randomSort}.json?limit=100`;
+        if (randomSort === 'top') {
+            const randomTime = TIME_PERIODS[Math.floor(Math.random() * TIME_PERIODS.length)];
+            url += `&t=${randomTime}`;
+        }
+        
+        const response = await axios.get(url);
         
         if (!response.data || !response.data.data || !response.data.data.children) {
             throw new Error('Invalid response from Reddit');
@@ -315,6 +307,20 @@ async function sendMemeWithKeyboard(bot, chatId, meme, preferredSubreddit, media
             lastMemeMessages.set(chatId, sentMessage.message_id);
         }
 
+        // Store the original sender's info
+        sentMemes.set(sentMessage.message_id, {
+            originalSender: chatId,
+            timestamp: Date.now()
+        });
+
+        // Clean up old entries (older than 24 hours)
+        const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+        for (const [msgId, data] of sentMemes.entries()) {
+            if (data.timestamp < dayAgo) {
+                sentMemes.delete(msgId);
+            }
+        }
+
         return sentMessage;
     } catch (error) {
         console.error('Error in sendMemeWithKeyboard:', error);
@@ -525,8 +531,7 @@ function setupMemeCommand(bot) {
                         photo,
                         {
                             caption: newCaption,
-                            parse_mode: 'Markdown',
-                            reply_markup: getReactionKeyboard()
+                            parse_mode: 'Markdown'
                         }
                     );
                 } else if (query.message.video) {
@@ -536,8 +541,7 @@ function setupMemeCommand(bot) {
                         query.message.video.file_id,
                         {
                             caption: newCaption,
-                            parse_mode: 'Markdown',
-                            reply_markup: getReactionKeyboard()
+                            parse_mode: 'Markdown'
                         }
                     );
                 }
@@ -622,51 +626,28 @@ function setupMemeCommand(bot) {
                     console.error('Error updating error button:', error);
                 }
             }
-        } else if (query.data.startsWith('reaction_')) {
-            try {
-                const reactionKey = query.data.replace('reaction_', '');
-                const reaction = REACTIONS[reactionKey];
-                const sharedMeme = sharedMemes.get(query.message.message_id);
+        }
+    });
 
-                if (sharedMeme && query.from.id.toString() === sharedMeme.toId.toString()) {
-                    // Send notification to original sender
-                    const notification = `*${reaction.emoji} Reaction to your meme:*\n\n`;
-                    
-                    // Send the original meme back with the reaction
-                    await bot.sendPhoto(
-                        sharedMeme.fromId,
-                        sharedMeme.memeData.photo,
-                        {
-                            caption: `${notification}${sharedMeme.memeData.title}\n\n` +
-                                    `*${query.from.first_name} reacted with ${reaction.emoji}*`,
-                            parse_mode: 'Markdown'
-                        }
-                    );
-
-                    // Remove reaction buttons after reaction is sent
-                    await bot.editMessageReplyMarkup(
-                        { inline_keyboard: [] },
-                        {
-                            chat_id: query.message.chat.id,
-                            message_id: query.message.message_id
-                        }
-                    );
-
-                    // Remove from tracking
-                    sharedMemes.delete(query.message.message_id);
-
-                    // Confirm reaction to user
-                    await bot.answerCallbackQuery(query.id, {
-                        text: `${reaction.emoji} Reaction sent!`,
-                        show_alert: false
-                    });
-                }
-            } catch (error) {
-                console.error('Error handling reaction:', error);
-                await bot.answerCallbackQuery(query.id, {
-                    text: '❌ Failed to send reaction. Please try again.',
-                    show_alert: true
-                });
+    // Listen for message reactions
+    bot.on('message_reaction', async (reaction) => {
+        const messageId = reaction.message_id;
+        const memeData = sentMemes.get(messageId);
+        
+        if (memeData) {
+            const reactorName = reaction.user.id === Number(process.env.ARANE_CHAT_ID) ? 'Arane' : 
+                              reaction.user.id === Number(process.env.YVAINE_CHAT_ID) ? 'Yvaine' : 
+                              'Someone';
+            
+            // Get the emoji that was reacted with
+            const emoji = reaction.new_reaction[0]?.emoji || '👍';
+            
+            // Notify the original sender
+            if (reaction.user.id !== memeData.originalSender) {
+                await bot.sendMessage(
+                    memeData.originalSender,
+                    `${reactorName} reacted with ${emoji} to your meme!`
+                );
             }
         }
     });
