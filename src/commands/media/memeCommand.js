@@ -30,28 +30,12 @@ const lastMemeMessages = new Map(); // Stores the last meme message ID for each 
 // Track shared memes with all necessary details
 const sharedMemes = new Map(); // messageId -> { fromId, toId, memeData }
 
-// Add this constant for reaction buttons
-const REACTIONS = {
-    HILARIOUS: { emoji: '🤣' },
-    LOVE: { emoji: '❤' },
-    FIRE: { emoji: '' },
-    DEAD: { emoji: '💀' },
-    MEH: { emoji: '😐' }
-};
+// Track sent memes and their original senders
+const sentMemes = new Map();
 
-// Add function to create reaction keyboard
-const getReactionKeyboard = () => {
-    return {
-        inline_keyboard: [
-            Object.entries(REACTIONS).map(([key, value]) => ({
-                text: value.emoji,
-                callback_data: `reaction_${key}`
-            }))
-        ]
-    };
-};
-
-const SORT_TYPE = 'hot'; // default sort type
+// Reddit sort types and time periods
+const SORT_TYPES = ['hot', 'top', 'new'];
+const TIME_PERIODS = ['hour', 'day', 'week', 'month', 'year', 'all'];
 
 async function getMemeFromReddit(subreddit = null, mediaType = 'pics') {
     try {
@@ -63,7 +47,15 @@ async function getMemeFromReddit(subreddit = null, mediaType = 'pics') {
         }
 
         const randomSubreddit = targetSubreddits[Math.floor(Math.random() * targetSubreddits.length)];
-        const response = await axios.get(`https://www.reddit.com/r/${randomSubreddit}/${SORT_TYPE}.json?limit=100`);
+        const randomSort = SORT_TYPES[Math.floor(Math.random() * SORT_TYPES.length)];
+        
+        let url = `https://www.reddit.com/r/${randomSubreddit}/${randomSort}.json?limit=100`;
+        if (randomSort === 'top') {
+            const randomTime = TIME_PERIODS[Math.floor(Math.random() * TIME_PERIODS.length)];
+            url += `&t=${randomTime}`;
+        }
+        
+        const response = await axios.get(url);
         
         if (!response.data || !response.data.data || !response.data.data.children) {
             throw new Error('Invalid response from Reddit');
@@ -71,23 +63,103 @@ async function getMemeFromReddit(subreddit = null, mediaType = 'pics') {
 
         const posts = response.data.data.children
             .filter(post => {
-                // Filter based on mediaType
                 if (mediaType === 'vids') {
-                    return (post.data.is_video || 
-                           (post.data.url && (
-                               post.data.url.includes('redgifs.com/watch/') ||
-                               post.data.url.includes('imgur.com') && post.data.url.endsWith('.gifv')
-                           )));
+                    // For videos, check if it's a video post and get the best video URL
+                    const isDirectVideo = post.data.url && (
+                        post.data.url.endsWith('.mp4') ||
+                        post.data.url.endsWith('.webm') ||
+                        post.data.url.endsWith('.mov') ||
+                        post.data.url.endsWith('.gif') ||
+                        post.data.url.endsWith('.gifv')
+                    );
+
+                    // Check Reddit's native video
+                    const isRedditVideo = post.data.is_video || 
+                                        post.data.url?.includes('v.redd.it') ||
+                                        post.data.media?.reddit_video;
+
+                    // Check various media providers
+                    const isKnownVideoProvider = post.data.url && (
+                        // Reddit's video domain
+                        post.data.url.includes('v.redd.it') ||
+                        // Imgur
+                        (post.data.url.includes('imgur.com') && 
+                         (post.data.url.includes('/video/') || 
+                          post.data.url.endsWith('.gifv') ||
+                          post.data.url.includes('.gif') ||
+                          post.data.url.includes('/a/') ||  // Imgur albums often contain videos
+                          post.data.url.includes('/gallery/'))) ||
+                        // Gfycat
+                        post.data.url.includes('gfycat.com') ||
+                        // Redgifs
+                        post.data.url.includes('redgifs.com') ||
+                        // Streamable
+                        post.data.url.includes('streamable.com') ||
+                        // YouTube
+                        post.data.url.includes('youtu.be') ||
+                        post.data.url.includes('youtube.com')
+                    );
+
+                    // Check embedded media
+                    const hasEmbeddedMedia = post.data.media && (
+                        post.data.media.type === 'video' ||
+                        post.data.media.type === 'gif' ||
+                        post.data.media.reddit_video ||
+                        post.data.media.oembed?.type === 'video' ||
+                        post.data.media.oembed?.provider_name?.toLowerCase() === 'youtube' ||
+                        post.data.media.oembed?.provider_name?.toLowerCase() === 'redgifs'
+                    );
+
+                    // Check video preview data
+                    const hasVideoPreview = post.data.preview?.reddit_video_preview || 
+                                         post.data.secure_media?.reddit_video || 
+                                         post.data.preview?.images?.[0]?.variants?.mp4;
+
+                    const isVideo = isDirectVideo || isRedditVideo || isKnownVideoProvider || hasEmbeddedMedia || hasVideoPreview;
+
+                    if (isVideo && mediaType === 'vids') {
+                        // Get the best video URL available
+                        let videoUrl = post.data.url;
+                        
+                        // If it's a Reddit video or has video preview, use the fallback URL
+                        if (hasVideoPreview) {
+                            const preview = post.data.preview?.reddit_video_preview || 
+                                          post.data.secure_media?.reddit_video ||
+                                          post.data.preview?.images?.[0]?.variants?.mp4;
+                            if (preview?.fallback_url) {
+                                videoUrl = preview.fallback_url;
+                            } else if (preview?.source?.url) {
+                                // For GIFs, use the MP4 preview URL
+                                videoUrl = preview.source.url;
+                            }
+                        }
+                        
+                        // Update the post URL to use the video URL
+                        post.data.url = videoUrl;
+                        return true;
+                    }
+
+                    return isVideo;
                 } else {
-                    return (!post.data.is_video && 
-                            post.data.url && 
-                            (post.data.url.endsWith('.jpg') || 
-                             post.data.url.endsWith('.png') || 
-                             post.data.url.endsWith('.gif')));
+                    // For pictures, exclude any video/gif content
+                    const isPicture = post.data.url && (
+                        post.data.url.endsWith('.jpg') ||
+                        post.data.url.endsWith('.jpeg') ||
+                        post.data.url.endsWith('.png') ||
+                        post.data.url.endsWith('.webp') ||
+                        // Include Imgur direct images
+                        (post.data.url.includes('imgur.com') && 
+                         !post.data.url.includes('/video/') &&
+                         !post.data.url.includes('/a/') &&
+                         !post.data.url.includes('/gallery/') &&
+                         !post.data.url.endsWith('.gif') &&
+                         !post.data.url.endsWith('.gifv'))
+                    );
+
+                    return !post.data.is_video && isPicture;
                 }
             })
-            .filter(post => !post.data.over_18); // Filter out NSFW content
-
+            
         if (posts.length === 0) {
             throw new Error(`No suitable ${mediaType} found in r/${randomSubreddit}`);
         }
@@ -97,15 +169,22 @@ async function getMemeFromReddit(subreddit = null, mediaType = 'pics') {
         // Handle different video URL formats
         let mediaUrl = randomPost.url;
         if (mediaType === 'vids') {
-            if (randomPost.is_video) {
-                mediaUrl = randomPost.media.reddit_video.fallback_url;
-            } else if (randomPost.url.includes('redgifs.com/watch/')) {
-                // For redgifs, we need to get the direct video URL
-                const videoId = randomPost.url.split('/').pop();
-                throw new Error('Redgifs videos are not supported yet');
-            } else if (randomPost.url.includes('imgur.com') && randomPost.url.endsWith('.gifv')) {
-                // Convert imgur .gifv to .mp4
-                mediaUrl = randomPost.url.replace('.gifv', '.mp4');
+            if (randomPost.is_video || randomPost.preview?.reddit_video_preview) {
+                // Use the highest quality video URL available
+                mediaUrl = randomPost.media?.reddit_video?.fallback_url || 
+                          randomPost.preview?.reddit_video_preview?.fallback_url;
+            } else if (randomPost.url.includes('redgifs.com')) {
+                // For redgifs, use the preview video URL if available
+                mediaUrl = randomPost.preview?.reddit_video_preview?.fallback_url || 
+                          randomPost.media?.reddit_video?.fallback_url;
+                if (!mediaUrl) {
+                    // Skip this post if we can't get a direct video URL
+                    throw new Error('Could not get direct video URL');
+                }
+            } else if (randomPost.url.includes('imgur.com')) {
+                if (randomPost.url.endsWith('.gifv')) {
+                    mediaUrl = randomPost.url.replace('.gifv', '.mp4');
+                }
             }
         }
 
@@ -113,13 +192,13 @@ async function getMemeFromReddit(subreddit = null, mediaType = 'pics') {
             title: randomPost.title,
             url: mediaUrl,
             author: randomPost.author,
-            upvotes: randomPost.ups,
-            link: `https://reddit.com${randomPost.permalink}`,
-            subreddit: randomPost.subreddit,
-            description: randomPost.selftext || '',
-            isVideo: mediaType === 'vids'
+            permalink: randomPost.permalink,
+            score: randomPost.score,
+            subreddit: randomPost.subreddit
         };
     } catch (error) {
+        // Simplified error logging
+        console.error(`Error in getMemeFromReddit: ${error.message}`);
         throw error;
     }
 }
@@ -162,15 +241,15 @@ async function sendMemeWithKeyboard(bot, chatId, meme, preferredSubreddit, media
 
         const caption = `${escapedTitle}\n\n` +
                        `👤 Posted by u/${escapedAuthor}\n` +
-                       `📊 ${meme.upvotes.toLocaleString()} upvotes\n` +
-                       `🔗 [Original Post](${meme.link})\n` +
+                       `📊 ${meme.score.toLocaleString()} upvotes\n` +
+                       `🔗 [Original Post](https://reddit.com${meme.permalink})\n` +
                        `📍 From r/${escapedSubreddit}`;
 
         const keyboard = getCustomInlineKeyboard(chatId, preferredSubreddit);
 
         // Send the meme
         let sentMessage;
-        if (meme.isVideo) {
+        if (mediaType === 'vids') {
             sentMessage = await bot.sendVideo(chatId, meme.url, {
                 caption: caption,
                 parse_mode: 'Markdown',
@@ -226,6 +305,20 @@ async function sendMemeWithKeyboard(bot, chatId, meme, preferredSubreddit, media
         // Store the ID of the sent message
         if (sentMessage) {
             lastMemeMessages.set(chatId, sentMessage.message_id);
+        }
+
+        // Store the original sender's info
+        sentMemes.set(sentMessage.message_id, {
+            originalSender: chatId,
+            timestamp: Date.now()
+        });
+
+        // Clean up old entries (older than 24 hours)
+        const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+        for (const [msgId, data] of sentMemes.entries()) {
+            if (data.timestamp < dayAgo) {
+                sentMemes.delete(msgId);
+            }
         }
 
         return sentMessage;
@@ -305,6 +398,8 @@ function setupMemeCommand(bot) {
                 } else {
                     specificSubreddit = args[0];
                     userPref.defaultSubreddit = args[0];
+                    // Keep using the existing mediaType preference or default to 'pics'
+                    mediaType = userPref.defaultMediaType || 'pics';
                     await bot.sendMessage(
                         chatId,
                         `✅ Default subreddit set to: r/${args[0]}\nFuture /mm commands will fetch memes from this subreddit by default.`,
@@ -338,14 +433,14 @@ function setupMemeCommand(bot) {
             }
 
         } catch (error) {
-            console.error('Error in meme command:', error);
+            // Simplified error logging
+            console.error(`Error in meme command: ${error.message}`);
             bot.sendMessage(
                 chatId, 
-                `❌ Sorry, couldn't fetch a ${mediaType === 'vids' ? 'video' : 'picture'} meme. ${error.message}\n\n` +
+                `❌ Sorry, couldn't fetch a ${mediaType || 'picture'} meme. ${error.message}\n\n` +
                 'Try:\n' +
                 '- Different subreddit\n' +
-                '- Different media type (pics/vids)\n' +
-                '- Wait a few moments and try again'
+                '- Different media type (pics/vids)'
             );
         }
     });
@@ -436,8 +531,7 @@ function setupMemeCommand(bot) {
                         photo,
                         {
                             caption: newCaption,
-                            parse_mode: 'Markdown',
-                            reply_markup: getReactionKeyboard()
+                            parse_mode: 'Markdown'
                         }
                     );
                 } else if (query.message.video) {
@@ -447,8 +541,7 @@ function setupMemeCommand(bot) {
                         query.message.video.file_id,
                         {
                             caption: newCaption,
-                            parse_mode: 'Markdown',
-                            reply_markup: getReactionKeyboard()
+                            parse_mode: 'Markdown'
                         }
                     );
                 }
@@ -533,51 +626,28 @@ function setupMemeCommand(bot) {
                     console.error('Error updating error button:', error);
                 }
             }
-        } else if (query.data.startsWith('reaction_')) {
-            try {
-                const reactionKey = query.data.replace('reaction_', '');
-                const reaction = REACTIONS[reactionKey];
-                const sharedMeme = sharedMemes.get(query.message.message_id);
+        }
+    });
 
-                if (sharedMeme && query.from.id.toString() === sharedMeme.toId.toString()) {
-                    // Send notification to original sender
-                    const notification = `*${reaction.emoji} Reaction to your meme:*\n\n`;
-                    
-                    // Send the original meme back with the reaction
-                    await bot.sendPhoto(
-                        sharedMeme.fromId,
-                        sharedMeme.memeData.photo,
-                        {
-                            caption: `${notification}${sharedMeme.memeData.title}\n\n` +
-                                    `*${query.from.first_name} reacted with ${reaction.emoji}*`,
-                            parse_mode: 'Markdown'
-                        }
-                    );
-
-                    // Remove reaction buttons after reaction is sent
-                    await bot.editMessageReplyMarkup(
-                        { inline_keyboard: [] },
-                        {
-                            chat_id: query.message.chat.id,
-                            message_id: query.message.message_id
-                        }
-                    );
-
-                    // Remove from tracking
-                    sharedMemes.delete(query.message.message_id);
-
-                    // Confirm reaction to user
-                    await bot.answerCallbackQuery(query.id, {
-                        text: `${reaction.emoji} Reaction sent!`,
-                        show_alert: false
-                    });
-                }
-            } catch (error) {
-                console.error('Error handling reaction:', error);
-                await bot.answerCallbackQuery(query.id, {
-                    text: '❌ Failed to send reaction. Please try again.',
-                    show_alert: true
-                });
+    // Listen for message reactions
+    bot.on('message_reaction', async (reaction) => {
+        const messageId = reaction.message_id;
+        const memeData = sentMemes.get(messageId);
+        
+        if (memeData) {
+            const reactorName = reaction.user.id === Number(process.env.ARANE_CHAT_ID) ? 'Arane' : 
+                              reaction.user.id === Number(process.env.YVAINE_CHAT_ID) ? 'Yvaine' : 
+                              'Someone';
+            
+            // Get the emoji that was reacted with
+            const emoji = reaction.new_reaction[0]?.emoji || '👍';
+            
+            // Notify the original sender
+            if (reaction.user.id !== memeData.originalSender) {
+                await bot.sendMessage(
+                    memeData.originalSender,
+                    `${reactorName} reacted with ${emoji} to your meme!`
+                );
             }
         }
     });
