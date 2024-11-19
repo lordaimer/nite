@@ -116,6 +116,18 @@ I am a versatile personal assistant bot currently under development.`;
             note: '\nClicking on the movie title opens its IMDb page. The storyline text is copyable.'
         },
         {
+            command: '/gameinfo, /gs',
+            description: 'Search for video game information with details and cover art',
+            usage: '/gameinfo <game title>',
+            examples: [
+                '/gameinfo Assassin\'s Creed Valhalla',
+                '/gs The Witcher 3',
+                '/gameinfo Red Dead Redemption 2'
+            ],
+            category: 'Entertainment',
+            note: '\nClicking on the game title opens its RAWG page. Includes ratings, release date, platforms, and more.'
+        },
+        {
             command: '/translate, /trns',
             description: 'Translate text between languages',
             usage: '/translate or /trns',
