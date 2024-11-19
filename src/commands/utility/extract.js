@@ -257,19 +257,25 @@ export function setupExtractCommand(bot, limit) {
         }
 
         if (data === 'ext_select') {
+            // Count files and folders
+            const fileCount = userState.extractedFiles.filter(f => !f.isDir).length;
+            const folderCount = userState.extractedFiles.filter(f => f.isDir).length;
+
             const keyboard = {
-                inline_keyboard: userState.extractedFiles.map(file => ([{
-                    text: `${file.isDir ? '📁' : '📄'} ${file.path}`,
-                    callback_data: `ext_file_${file.path}`
-                }]))
+                inline_keyboard: [
+                    ...userState.extractedFiles.map(file => ([{
+                        text: `${file.isDir ? '📁' : '📄'} ${file.path}`,
+                        callback_data: `ext_file_${file.path}`
+                    }])),
+                    [{
+                        text: '✅ Done',
+                        callback_data: `ext_done_${fileCount}_${folderCount}`
+                    }]
+                ]
             };
-            keyboard.inline_keyboard.push([{
-                text: '✅ Done',
-                callback_data: 'ext_done'
-            }]);
 
             await bot.editMessageText(
-                'Select files to send:',
+                `Select files to send:\nTotal: ${fileCount} files, ${folderCount} folders`,
                 {
                     chat_id: chatId,
                     message_id: messageId,
@@ -282,27 +288,47 @@ export function setupExtractCommand(bot, limit) {
             const filePath = data.replace('ext_file_', '');
             const fileInfo = userState.extractedFiles.find(f => f.path === filePath);
 
-            if (fileInfo && !fileInfo.isDir) {
+            if (fileInfo) {
+                if (fileInfo.isDir) {
+                    await bot.answerCallbackQuery(query.id, {
+                        text: '📁 This is a directory',
+                        show_alert: true
+                    });
+                    return;
+                }
+
                 try {
                     const fullPath = path.join(userState.extractPath, filePath);
-                    await bot.sendDocument(chatId, fullPath);
-                    await bot.answerCallbackQuery(query.id, { text: '✅ File sent!' });
+                    console.log(`[DEBUG] Sending individual file: ${fullPath}`);
+
+                    // Create a read stream for the file
+                    const fileStream = fs.createReadStream(fullPath);
+                    const stats = fs.statSync(fullPath);
+
+                    // Send as document with original filename
+                    await bot.sendDocument(chatId, fileStream, {
+                        filename: path.basename(filePath),
+                        caption: `File: ${filePath}\nSize: ${formatFileSize(stats.size)}`
+                    });
+
+                    console.log(`[DEBUG] Successfully sent: ${filePath}`);
+                    await bot.answerCallbackQuery(query.id, {
+                        text: '✅ File sent!',
+                        show_alert: false
+                    });
                 } catch (error) {
-                    await bot.answerCallbackQuery(query.id, { 
-                        text: '❌ Error sending file',
+                    console.error(`[DEBUG] Error sending file ${filePath}:`, error);
+                    await bot.answerCallbackQuery(query.id, {
+                        text: '❌ Failed to send file: ' + error.message,
                         show_alert: true
                     });
                 }
-            } else if (fileInfo && fileInfo.isDir) {
-                await bot.answerCallbackQuery(query.id, { 
-                    text: 'This is a directory',
-                    show_alert: true
-                });
             }
-
-        } else if (data === 'ext_done') {
+        } else if (data.startsWith('ext_done_')) {
+            const [_, fileCount, folderCount] = data.split('_');
+            
             await bot.editMessageText(
-                '✅ File selection completed!',
+                `File extraction complete:\nTotal extracted: ${fileCount} files, ${folderCount} folders`,
                 {
                     chat_id: chatId,
                     message_id: messageId
@@ -311,7 +337,7 @@ export function setupExtractCommand(bot, limit) {
             await bot.answerCallbackQuery(query.id);
 
             // Cleanup
-            await cleanupTempDir(userState.extractPath);
+            cleanupExtractedFiles(userState);
             userStates.delete(chatId);
         }
     });
