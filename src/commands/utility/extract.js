@@ -17,7 +17,8 @@ export function setupExtractCommand(bot, limit) {
             waitingForZip: true,
             messageId: null,
             extractedFiles: [],
-            extractPath: null
+            extractPath: null,
+            currentPath: ''
         });
 
         const response = await bot.sendMessage(
@@ -131,23 +132,7 @@ export function setupExtractCommand(bot, limit) {
                 userState.extractedFiles = extractedFiles;
 
                 // Show success message with options
-                const keyboard = {
-                    inline_keyboard: [
-                        [
-                            { text: 'Send All', callback_data: 'ext_send_all' },
-                            { text: 'Select Files', callback_data: 'ext_select' }
-                        ]
-                    ]
-                };
-
-                await bot.editMessageText(
-                    `✅ ZIP file extracted successfully!\nFound ${extractedFiles.length} files/folders.\nWhat would you like to do?`,
-                    {
-                        chat_id: chatId,
-                        message_id: userState.messageId,
-                        reply_markup: keyboard
-                    }
-                );
+                await showFileList(bot, chatId, userState.messageId, userState);
                 
                 // Update state
                 userState.waitingForZip = false;
@@ -257,31 +242,7 @@ export function setupExtractCommand(bot, limit) {
         }
 
         if (data === 'ext_select') {
-            // Count files and folders
-            const fileCount = userState.extractedFiles.filter(f => !f.isDir).length;
-            const folderCount = userState.extractedFiles.filter(f => f.isDir).length;
-
-            const keyboard = {
-                inline_keyboard: [
-                    ...userState.extractedFiles.map(file => ([{
-                        text: `${file.isDir ? '📁' : '📄'} ${file.path}`,
-                        callback_data: `ext_file_${file.path}`
-                    }])),
-                    [{
-                        text: '✅ Done',
-                        callback_data: `ext_done_${fileCount}_${folderCount}`
-                    }]
-                ]
-            };
-
-            await bot.editMessageText(
-                `Select files to send:\nTotal: ${fileCount} files, ${folderCount} folders`,
-                {
-                    chat_id: chatId,
-                    message_id: messageId,
-                    reply_markup: keyboard
-                }
-            );
+            await showFileList(bot, chatId, messageId, userState);
             await bot.answerCallbackQuery(query.id);
 
         } else if (data.startsWith('ext_file_')) {
@@ -290,9 +251,12 @@ export function setupExtractCommand(bot, limit) {
 
             if (fileInfo) {
                 if (fileInfo.isDir) {
+                    // Navigate into directory
+                    userState.currentPath = filePath;
+                    await showFileList(bot, chatId, messageId, userState);
                     await bot.answerCallbackQuery(query.id, {
-                        text: '📁 This is a directory',
-                        show_alert: true
+                        text: `📁 Opened folder: ${path.basename(filePath)}`,
+                        show_alert: false
                     });
                     return;
                 }
@@ -324,6 +288,16 @@ export function setupExtractCommand(bot, limit) {
                     });
                 }
             }
+        } else if (data === 'ext_back') {
+            // Navigate back to parent directory
+            userState.currentPath = path.dirname(userState.currentPath);
+            if (userState.currentPath === '.') userState.currentPath = ''; // Reset to root if we're at .
+            
+            await showFileList(bot, chatId, messageId, userState);
+            await bot.answerCallbackQuery(query.id, {
+                text: '📁 Returned to parent folder',
+                show_alert: false
+            });
         } else if (data.startsWith('ext_done_')) {
             const [_, fileCount, folderCount] = data.split('_');
             
@@ -340,6 +314,69 @@ export function setupExtractCommand(bot, limit) {
             cleanupExtractedFiles(userState);
             userStates.delete(chatId);
         }
+    });
+}
+
+/**
+ * Shows the file list for the current directory
+ */
+async function showFileList(bot, chatId, messageId, userState) {
+    const currentPath = userState.currentPath;
+    console.log(`[DEBUG] Showing files for path: ${currentPath}`);
+
+    // Filter files for current directory
+    const filesInDir = userState.extractedFiles.filter(file => {
+        if (!currentPath) {
+            // In root directory, show only root level files/folders
+            return !file.path.includes('/');
+        } else {
+            // In subdirectory, show only direct children
+            const relativePath = path.relative(currentPath, file.path);
+            return relativePath && !relativePath.includes('/') && file.path.startsWith(currentPath + '/');
+        }
+    });
+
+    // Count files and folders in current directory
+    const fileCount = filesInDir.filter(f => !f.isDir).length;
+    const folderCount = filesInDir.filter(f => f.isDir).length;
+
+    // Create keyboard buttons for files and folders
+    const fileButtons = filesInDir.map(file => ([{
+        text: `${file.isDir ? '📁' : '📄'} ${path.basename(file.path)}`,
+        callback_data: `ext_file_${file.path}`
+    }]));
+
+    // Add navigation buttons
+    const navButtons = [];
+    if (currentPath) {
+        navButtons.push({
+            text: '⬅️ Back',
+            callback_data: 'ext_back'
+        });
+    }
+    navButtons.push({
+        text: '✅ Done',
+        callback_data: `ext_done_${fileCount}_${folderCount}`
+    });
+
+    const keyboard = {
+        inline_keyboard: [
+            ...fileButtons,
+            navButtons // Navigation row at the bottom
+        ]
+    };
+
+    // Create message text with current path and counts
+    let messageText = 'Select files to send:\n';
+    if (currentPath) {
+        messageText += `📁 Current folder: ${currentPath}\n`;
+    }
+    messageText += `Total in current folder: ${fileCount} files, ${folderCount} folders`;
+
+    await bot.editMessageText(messageText, {
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: keyboard
     });
 }
 
