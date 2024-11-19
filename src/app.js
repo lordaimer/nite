@@ -11,6 +11,7 @@ import {
     setupMemeCommand,
     setupImageCommand,
     setupMovieCommand,
+    setupGameCommand,
     setupDownloadCommand,
     setupTranscribeCommand,
     setupTimeCommand,
@@ -80,24 +81,27 @@ setupAdminCommands(bot);
 setupAccessControl(bot);
 
 // Setup all commands with rate limiting
-function setupCommandsWithRateLimits() {
+async function setupCommandsWithRateLimits() {
+    // Media commands
+    setupMemeCommand(bot, rateLimitService);
+    setupImageCommand(bot, rateLimitService);
+    setupMovieCommand(bot, rateLimitService);
+    setupGameCommand(bot, rateLimitService);
+    setupDownloadCommand(bot, rateLimitService);
+    setupTranscribeCommand(bot, rateLimitService, voiceService);
+    setupWhatToWatchCommand(bot, rateLimitService);
+
     const commands = [
         { setup: setupTimeCommand, name: 'time' },
         { setup: setupHelpCommand, name: 'help' },
         { setup: setupStartCommand, name: 'start' },
         { setup: setupCurrencyCommand, name: 'currency' },
-        { setup: setupMemeCommand, name: 'meme' },
         { setup: setupJokeCommand, name: 'joke' },
         { setup: setupFactCommand, name: 'fact' },
-        { setup: setupImageCommand, name: 'imagine' },
-        { setup: setupTranscribeCommand, name: 'voice' },
         { setup: setupSubscribeCommand, name: 'subscribe' },
-        { setup: setupMovieCommand, name: 'movie' },
         { setup: setupTranslateCommand, name: 'translate' },
         { setup: setupQuoteCommand, name: 'quote' },
         { setup: setupBugCommand, name: 'bug' },
-        { setup: setupDownloadCommand, name: 'download' },
-        { setup: setupWhatToWatchCommand, name: 'whattowatch' },
         { setup: setupTruthOrDareCommand, name: 'truthordare' },
         { setup: setupExtractCommand, name: 'extract' }
     ];

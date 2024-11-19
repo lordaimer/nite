@@ -5,6 +5,7 @@ export { setupAdminCommands } from './admin/adminCommands.js';
 export { setupMemeCommand, getMemeResponse } from './media/memeCommand.js';
 export { setupImageCommand } from './media/imagineCommand.js';
 export { setupMovieCommand } from './media/movieCommand.js';
+export { setupGameCommand } from './media/gameCommand.js';
 export { setupDownloadCommand } from './media/downloadCommand.js';
 export { setupTranscribeCommand } from './media/transcribeCommand.js';
 export { setupWhatToWatchCommand } from './media/whatToWatchCommand.js';
