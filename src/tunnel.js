@@ -10,16 +10,12 @@ async function setupTunnel() {
             region: 'us',
             authtoken: process.env.NGROK_AUTHTOKEN
         });
-        console.log('🔒 HTTPS Tunnel URL:', url);
         
-        // Update Mini App URL
         const miniAppUrl = `${url}/games`;
         updateMiniAppUrl(miniAppUrl);
-        console.log('🎮 Mini App URL:', miniAppUrl);
         
         return url;
     } catch (error) {
-        console.error('Error setting up ngrok tunnel:', error);
         process.exit(1);
     }
 }

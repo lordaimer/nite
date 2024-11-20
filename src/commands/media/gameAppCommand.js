@@ -4,7 +4,6 @@ let currentMiniAppUrl = process.env.MINI_APP_URL || 'https://your-mini-app-url.c
 // Function to update the Mini App URL
 export function updateMiniAppUrl(newUrl) {
     currentMiniAppUrl = newUrl;
-    console.log('🔄 Updated Mini App URL:', currentMiniAppUrl);
 }
 
 async function handleCommand(bot, msg, rateLimitService) {
@@ -35,7 +34,6 @@ async function handleCommand(bot, msg, rateLimitService) {
             { reply_markup: inlineKeyboard }
         );
     } catch (error) {
-        console.error('Error in game command:', error);
         await bot.sendMessage(
             chatId,
             '❌ Sorry, there was an error launching the game hub. Please try again later.'
@@ -45,5 +43,4 @@ async function handleCommand(bot, msg, rateLimitService) {
 
 export function setupGameAppCommand(bot, rateLimitService) {
     bot.onText(/^\/(game|gm)$/, (msg) => handleCommand(bot, msg, rateLimitService));
-    console.log('✅ Game app command is loaded!');
 }
