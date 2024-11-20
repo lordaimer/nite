@@ -42,7 +42,7 @@ function resetGame() {
 
 function updateTurnIndicator() {
     if (!gameActive) return;
-    const playerText = currentPlayer === 'x' ? 'Your' : (isAIMode ? 'AI\'s' : 'Player O\'s');
+    const playerText = currentPlayer === 'x' ? 'Your' : (isAIMode ? 'Nite\'s' : 'Player O\'s');
     turnIndicator.textContent = `${playerText} turn`;
     turnIndicator.className = `turn-indicator ${currentPlayer}`;
 }
@@ -111,7 +111,7 @@ function handleCellClick(index) {
     if (result) {
         gameActive = false;
         showWinLine(result.pattern);
-        turnIndicator.textContent = currentPlayer === 'x' ? 'You win!' : (isAIMode ? 'AI wins!' : 'Player O wins!');
+        turnIndicator.textContent = currentPlayer === 'x' ? 'You win!' : (isAIMode ? 'Nite wins!' : 'Player O wins!');
     } else if (!gameBoard.includes('')) {
         gameActive = false;
         turnIndicator.textContent = "It's a draw!";
