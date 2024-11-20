@@ -5,27 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="ngrok-skip-browser-warning" content="true">
     <meta name="user-agent" content="NiteGameHub/1.0">
-    <title>Nite Game Hub</title>
+    <title>Nite Games</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <header class="game-hub-header">
-            <h1>Game Hub</h1>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>Nite Games</h1>
         </header>
         
-        <div class="games-grid">
-            <div class="game-card" data-game="tictactoe">
-                <div class="game-card-inner">
-                    <div class="game-icon">
-                        <img src="icons/tictactoe.svg" alt="Tic Tac Toe">
+        <main class="main-content">
+            <div class="games-grid">
+                <div class="game-card" data-game="tictactoe">
+                    <div class="game-card-inner">
+                        <div class="game-icon">
+                            <img src="icons/tictactoe.svg" alt="Tic Tac Toe">
+                        </div>
+                        <h2>Tic Tac Toe</h2>
+                        <div class="game-description">Challenge your friend in this classic battle!</div>
                     </div>
-                    <h2>Tic Tac Toe</h2>
-                    <div class="game-description">Challenge your friend in this classic battle!</div>
                 </div>
             </div>
-        </div>
+        </main>
+
+        <nav class="bottom-nav">
+            <div class="nav-item active">
+                <span class="material-icons">home</span>
+                <span>Home</span>
+            </div>
+            <div class="nav-item">
+                <span class="material-icons">sports_esports</span>
+                <span>Games</span>
+            </div>
+            <div class="nav-item">
+                <span class="material-icons">leaderboard</span>
+                <span>Score</span>
+            </div>
+            <div class="nav-item">
+                <span class="material-icons">person</span>
+                <span>Account</span>
+            </div>
+        </nav>
     </div>
     <script src="app.js"></script>
 </body>
