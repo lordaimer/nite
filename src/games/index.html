@@ -2,24 +2,29 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Nite Games</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="ngrok-skip-browser-warning" content="true">
+    <meta name="user-agent" content="NiteGameHub/1.0">
+    <title>Nite Game Hub</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>Nite Games</h1>
+        <header class="game-hub-header">
+            <h1>Game Hub</h1>
         </header>
         
         <div class="games-grid">
             <div class="game-card" data-game="tictactoe">
-                <div class="game-icon">❌</div>
-                <h2>Tic Tac Toe</h2>
-                <p>Classic two-player game</p>
+                <div class="game-card-inner">
+                    <div class="game-icon">
+                        <img src="icons/tictactoe.svg" alt="Tic Tac Toe">
+                    </div>
+                    <h2>Tic Tac Toe</h2>
+                    <div class="game-description">Challenge your friend in this classic battle!</div>
+                </div>
             </div>
-            <!-- More games will be added here -->
         </div>
     </div>
     <script src="app.js"></script>

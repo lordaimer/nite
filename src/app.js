@@ -17,8 +17,19 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Add global middleware for headers
+app.use((req, res, next) => {
+    res.setHeader('ngrok-skip-browser-warning', 'true');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    next();
+});
+
 // Serve static files from the games directory
-app.use('/games', express.static(join(__dirname, 'games')));
+app.use('/games', (req, res, next) => {
+    // Set header to skip ngrok browser warning
+    res.setHeader('ngrok-skip-browser-warning', '1');
+    next();
+}, express.static(join(__dirname, 'games')));
 
 // Start the server and setup tunnel
 app.listen(PORT, '0.0.0.0', async () => {

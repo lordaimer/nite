@@ -1,8 +1,11 @@
 :root {
-    --tg-theme-bg-color: #ffffff;
-    --tg-theme-text-color: #000000;
-    --tg-theme-button-color: #40a7e3;
-    --tg-theme-button-text-color: #ffffff;
+    --primary-color: #7AA2F7;
+    --secondary-color: #A6B1E1;
+    --background-color: #1A1B26;
+    --card-bg: #24283B;
+    --text-primary: #FFFFFF;
+    --text-secondary: #9699A3;
+    --hover-color: #414868;
 }
 
 * {
@@ -11,67 +14,171 @@
     box-sizing: border-box;
 }
 
+html, body {
+    height: 100vh;
+    overflow: hidden;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background-color: var(--tg-theme-bg-color);
-    color: var(--tg-theme-text-color);
+    background-color: var(--background-color);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .container {
-    max-width: 800px;
-    margin: 0 auto;
+    width: 100%;
+    height: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     padding: 20px;
 }
 
-header {
+.game-hub-header {
     text-align: center;
-    margin-bottom: 30px;
+    margin-bottom: 24px;
 }
 
-header h1 {
-    font-size: 24px;
-    font-weight: bold;
+.game-hub-header h1 {
+    font-size: 2.2em;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    letter-spacing: -0.5px;
 }
 
 .games-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 20px;
     padding: 10px;
 }
 
 .game-card {
-    background: rgba(var(--tg-theme-button-color), 0.1);
-    border-radius: 12px;
-    padding: 20px;
-    text-align: center;
+    position: relative;
+    border-radius: 20px;
+    background-color: var(--card-bg);
+    transition: all 0.3s ease;
+    overflow: hidden;
     cursor: pointer;
-    transition: transform 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .game-card:hover {
-    transform: translateY(-5px);
+    transform: translateY(-4px);
+    background-color: var(--hover-color);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.game-card:active {
+    transform: translateY(0);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.game-card-inner {
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
 }
 
 .game-icon {
-    font-size: 40px;
-    margin-bottom: 10px;
+    width: 90px;
+    height: 90px;
+    background: var(--primary-color);
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s ease;
+}
+
+.game-card:hover .game-icon {
+    transform: scale(1.05);
+}
+
+.game-icon img {
+    width: 60%;
+    height: 60%;
+    filter: brightness(0) invert(1);
 }
 
 .game-card h2 {
-    font-size: 18px;
-    margin-bottom: 5px;
+    font-size: 1.8em;
+    font-weight: 600;
+    text-align: center;
+    color: var(--text-primary);
+    margin: 0;
+    transition: transform 0.3s ease;
 }
 
-.game-card p {
-    font-size: 14px;
-    opacity: 0.8;
+.game-card:hover h2 {
+    transform: scale(1.05);
 }
 
-/* Telegram theme integration */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --tg-theme-bg-color: #1f1f1f;
-        --tg-theme-text-color: #ffffff;
+.game-description {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 1.1em;
+    line-height: 1.4;
+    transition: color 0.3s ease;
+}
+
+.game-card:hover .game-description {
+    color: var(--text-primary);
+}
+
+.play-button {
+    background: var(--primary-color);
+    border: none;
+    padding: 12px 28px;
+    border-radius: 12px;
+    color: white;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 100%;
+    max-width: 180px;
+}
+
+.play-button:hover {
+    background: var(--hover-color);
+    transform: translateY(-2px);
+}
+
+.play-button:active {
+    transform: translateY(0);
+}
+
+@media (max-height: 600px) {
+    .game-hub-header h1 {
+        font-size: 1.8em;
+    }
+    
+    .game-icon {
+        width: 70px;
+        height: 70px;
+    }
+    
+    .game-card h2 {
+        font-size: 1.5em;
+    }
+    
+    .game-description {
+        font-size: 1em;
+    }
+    
+    .game-card-inner {
+        padding: 24px;
+        gap: 12px;
+    }
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 16px;
     }
 }
