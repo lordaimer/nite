@@ -28,9 +28,8 @@ if (tg.platform !== 'unknown') {
 // Set theme class on body
 document.body.classList.add(`tg-theme-${tg.colorScheme}`);
 
-const card = document.querySelector('.game-card');
+const cards = document.querySelectorAll('.game-card');
 const light = document.querySelector('.light');
-const glowContainer = document.querySelector('.glow-container');
 let isTouch = false;
 
 function updateEffects(x, y) {
@@ -39,52 +38,60 @@ function updateEffects(x, y) {
     light.style.left = `${x}px`;
     light.style.top = `${y}px`;
 
-    // Calculate position relative to card
-    const rect = card.getBoundingClientRect();
-    const mouseX = x - rect.left;
-    const mouseY = y - rect.top;
+    // Update each card's glow effect
+    cards.forEach(card => {
+        const glowContainer = card.querySelector('.glow-container');
+        
+        // Calculate position relative to card
+        const rect = card.getBoundingClientRect();
+        const mouseX = x - rect.left;
+        const mouseY = y - rect.top;
 
-    // Calculate normalized position (0 to 1)
-    const normalizedX = mouseX / rect.width;
-    const normalizedY = mouseY / rect.height;
+        // Calculate normalized position (0 to 1)
+        const normalizedX = mouseX / rect.width;
+        const normalizedY = mouseY / rect.height;
 
-    // Calculate distance from borders
-    const distanceFromBorder = Math.min(
-        normalizedX,
-        1 - normalizedX,
-        normalizedY,
-        1 - normalizedY
-    );
+        // Calculate distance from borders
+        const distanceFromBorder = Math.min(
+            normalizedX,
+            1 - normalizedX,
+            normalizedY,
+            1 - normalizedY
+        );
 
-    // Calculate intensity based on proximity to border
-    const intensity = Math.max(0, 1 - (distanceFromBorder * 2.5));
+        // Calculate intensity based on proximity to border
+        const intensity = Math.max(0, 1 - (distanceFromBorder * 2.5));
 
-    // Update border glow with more focused radial gradient
-    glowContainer.style.background = `
-        radial-gradient(
-            300px at ${mouseX}px ${mouseY}px,
-            rgba(255, 255, 255, ${0.25 * intensity}) 0%,
-            rgba(255, 255, 255, ${0.15 * intensity}) 25%,
-            rgba(255, 255, 255, ${0.05 * intensity}) 35%,
-            rgba(255, 255, 255, 0) 70%
-        )
-    `;
+        // Update border glow with more focused radial gradient
+        glowContainer.style.background = `
+            radial-gradient(
+                300px at ${mouseX}px ${mouseY}px,
+                rgba(255, 255, 255, ${0.25 * intensity}) 0%,
+                rgba(255, 255, 255, ${0.15 * intensity}) 25%,
+                rgba(255, 255, 255, ${0.05 * intensity}) 35%,
+                rgba(255, 255, 255, 0) 70%
+            )
+        `;
 
-    // Add subtle inner glow
-    card.style.background = `
-        radial-gradient(
-            circle at ${mouseX}px ${mouseY}px,
-            rgba(255, 255, 255, ${0.03 * intensity}) 0%,
-            rgba(255, 255, 255, 0.01) 50%,
-            rgba(255, 255, 255, 0.005) 100%
-        )
-    `;
+        // Add subtle inner glow
+        card.style.background = `
+            radial-gradient(
+                circle at ${mouseX}px ${mouseY}px,
+                rgba(255, 255, 255, ${0.03 * intensity}) 0%,
+                rgba(255, 255, 255, 0.01) 50%,
+                rgba(255, 255, 255, 0.005) 100%
+            )
+        `;
+    });
 }
 
 function resetEffects() {
     light.style.opacity = '0';
-    glowContainer.style.background = 'var(--border-color)';
-    card.style.background = 'var(--card-bg)';
+    cards.forEach(card => {
+        const glowContainer = card.querySelector('.glow-container');
+        glowContainer.style.background = 'var(--border-color)';
+        card.style.background = 'var(--card-bg)';
+    });
 }
 
 // Mouse events
@@ -117,7 +124,8 @@ document.addEventListener('touchend', () => {
 });
 
 // Game card navigation
-card.addEventListener('click', () => {
+const actionCard = document.querySelector('.action-card');
+actionCard.addEventListener('click', () => {
     window.location.href = 'tictactoe/index.html';
 });
 

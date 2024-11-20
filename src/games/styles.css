@@ -61,16 +61,35 @@ body {
     z-index: 2;
 }
 
+.cards-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 320px;
+}
+
 /* Card styles */
 .game-card {
     width: 100%;
-    max-width: 320px;
     cursor: pointer;
     position: relative;
     border-radius: 20px;
     background: var(--card-bg);
-    padding: 24px;
     transition: transform 0.2s ease;
+}
+
+.main-card {
+    padding: 24px;
+    aspect-ratio: 4/3;
+}
+
+.action-card {
+    padding: 16px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Glow container for border effect */
@@ -96,11 +115,6 @@ body {
     margin-bottom: 20px;
     color: var(--text-primary);
     opacity: 0.8;
-    position: relative;
-}
-
-.game-content {
-    position: relative;
 }
 
 .game-content h2 {
@@ -113,11 +127,10 @@ body {
 .game-content p {
     color: var(--text-secondary);
     font-size: 16px;
-    margin-bottom: 16px;
+    line-height: 1.4;
 }
 
 .play-text {
-    display: inline-block;
     color: var(--text-primary);
     font-weight: 500;
     font-size: 14px;
