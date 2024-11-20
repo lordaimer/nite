@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="ngrok-skip-browser-warning" content="true">
     <meta name="user-agent" content="NiteGameHub/1.0">
     <title>Nite Games</title>
-    <link rel="stylesheet" href="styles.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div id="light-effect">
@@ -15,18 +15,17 @@
     </div>
     <div class="app-container">
         <div class="game-card" data-game="tictactoe">
-            <div class="game-card-inner">
-                <div class="game-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M19 3H5C3.89543 3 3 3.89543 3 5V19C3 20.1046 3.89543 21 5 21H19C20.1046 21 21 20.1046 21 19V5C21 3.89543 20.1046 3 19 3Z"/>
-                        <path d="M7 7L17 17M17 7L7 17"/>
-                    </svg>
-                </div>
-                <div class="game-content">
-                    <h2>Tic Tac Toe</h2>
-                    <p>Classic game</p>
-                    <span class="play-text">Play now</span>
-                </div>
+            <div class="glow-container"></div>
+            <div class="glow-effect"></div>
+            <div class="game-icon">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M19 8H29M19 40H29M8 19V29M40 19V29M13 13L16 16M32 32L35 35M35 13L32 16M16 32L13 35M24 19V29M19 24H29" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <div class="game-content">
+                <h2>Tic Tac Toe</h2>
+                <p>Challenge your friends to the classic game of X's and O's</p>
+                <span class="play-text">Play Now →</span>
             </div>
         </div>
     </div>

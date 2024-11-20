@@ -28,57 +28,96 @@ if (tg.platform !== 'unknown') {
 // Set theme class on body
 document.body.classList.add(`tg-theme-${tg.colorScheme}`);
 
-// Light effect
-const lightEffect = document.querySelector('.light');
+const card = document.querySelector('.game-card');
+const light = document.querySelector('.light');
+const glowContainer = document.querySelector('.glow-container');
 let isTouch = false;
-let lightTimeout;
 
-// Mouse move light effect
+function updateEffects(x, y) {
+    // Update light source position
+    light.style.opacity = '1';
+    light.style.left = `${x}px`;
+    light.style.top = `${y}px`;
+
+    // Calculate position relative to card
+    const rect = card.getBoundingClientRect();
+    const mouseX = x - rect.left;
+    const mouseY = y - rect.top;
+
+    // Calculate normalized position (0 to 1)
+    const normalizedX = mouseX / rect.width;
+    const normalizedY = mouseY / rect.height;
+
+    // Calculate distance from borders
+    const distanceFromBorder = Math.min(
+        normalizedX,
+        1 - normalizedX,
+        normalizedY,
+        1 - normalizedY
+    );
+
+    // Calculate intensity based on proximity to border
+    const intensity = Math.max(0, 1 - (distanceFromBorder * 2.5));
+
+    // Update border glow with more focused radial gradient
+    glowContainer.style.background = `
+        radial-gradient(
+            300px at ${mouseX}px ${mouseY}px,
+            rgba(255, 255, 255, ${0.25 * intensity}) 0%,
+            rgba(255, 255, 255, ${0.15 * intensity}) 25%,
+            rgba(255, 255, 255, ${0.05 * intensity}) 35%,
+            rgba(255, 255, 255, 0) 70%
+        )
+    `;
+
+    // Add subtle inner glow
+    card.style.background = `
+        radial-gradient(
+            circle at ${mouseX}px ${mouseY}px,
+            rgba(255, 255, 255, ${0.03 * intensity}) 0%,
+            rgba(255, 255, 255, 0.01) 50%,
+            rgba(255, 255, 255, 0.005) 100%
+        )
+    `;
+}
+
+function resetEffects() {
+    light.style.opacity = '0';
+    glowContainer.style.background = 'var(--border-color)';
+    card.style.background = 'var(--card-bg)';
+}
+
+// Mouse events
 document.addEventListener('mousemove', (e) => {
     if (!isTouch) {
-        clearTimeout(lightTimeout);
-        lightEffect.style.opacity = '1';
-        lightEffect.style.left = `${e.clientX}px`;
-        lightEffect.style.top = `${e.clientY}px`;
-        
-        // Start fade out timer
-        lightTimeout = setTimeout(() => {
-            lightEffect.style.opacity = '0';
-        }, 1000);
+        updateEffects(e.clientX, e.clientY);
     }
 });
 
 document.addEventListener('mouseleave', () => {
     if (!isTouch) {
-        lightEffect.style.opacity = '0';
+        resetEffects();
     }
 });
 
-// Touch effect
+// Touch events
 document.addEventListener('touchstart', (e) => {
     isTouch = true;
     const touch = e.touches[0];
-    clearTimeout(lightTimeout);
-    lightEffect.style.opacity = '1';
-    lightEffect.style.left = `${touch.clientX}px`;
-    lightEffect.style.top = `${touch.clientY}px`;
+    updateEffects(touch.clientX, touch.clientY);
 }, { passive: true });
 
 document.addEventListener('touchmove', (e) => {
     const touch = e.touches[0];
-    lightEffect.style.left = `${touch.clientX}px`;
-    lightEffect.style.top = `${touch.clientY}px`;
+    updateEffects(touch.clientX, touch.clientY);
 }, { passive: true });
 
 document.addEventListener('touchend', () => {
-    lightTimeout = setTimeout(() => {
-        lightEffect.style.opacity = '0';
-    }, 1000);
+    resetEffects();
 });
 
 // Game card navigation
-const gameCard = document.querySelector('.game-card');
-gameCard.addEventListener('click', () => {
+card.addEventListener('click', () => {
     window.location.href = 'tictactoe/index.html';
 });
 
