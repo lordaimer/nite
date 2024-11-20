@@ -89,7 +89,7 @@ function resetEffects() {
     light.style.opacity = '0';
     cards.forEach(card => {
         const glowContainer = card.querySelector('.glow-container');
-        glowContainer.style.background = 'var(--border-color)';
+        glowContainer.style.background = 'transparent';
         card.style.background = 'var(--card-bg)';
     });
 }

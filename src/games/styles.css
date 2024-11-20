@@ -28,16 +28,15 @@ body {
 /* Global light source */
 #global-light {
     position: fixed;
-    bottom: -80%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 200vw;
-    height: 200vw;
-    background: radial-gradient(circle, 
+    bottom: -20vh;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background: radial-gradient(circle at 50% 100%, 
         rgba(255, 255, 255, 0.06) 0%,
-        rgba(255, 255, 255, 0.045) 20%,
-        rgba(255, 255, 255, 0.03) 40%,
-        transparent 70%
+        rgba(255, 255, 255, 0.045) 35%,
+        rgba(255, 255, 255, 0.03) 65%,
+        transparent 90%
     );
     pointer-events: none;
     z-index: 0;
@@ -116,7 +115,7 @@ body {
     inset: -1px;
     border-radius: 20px;
     padding: 1px;
-    background: var(--border-color);
+    background: transparent;
     mask: 
         linear-gradient(#fff 0 0) content-box,
         linear-gradient(#fff 0 0);
