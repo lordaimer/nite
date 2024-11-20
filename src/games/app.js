@@ -28,17 +28,55 @@ if (tg.platform !== 'unknown') {
 // Set theme class on body
 document.body.classList.add(`tg-theme-${tg.colorScheme}`);
 
-// Game configurations
-const games = {
-    tictactoe: {
-        name: 'Tic Tac Toe',
-        path: '/games/tictactoe/',
-        description: 'Classic two-player game'
-    }
-    // Add more games here
-};
+// Light effect
+const lightEffect = document.querySelector('.light');
+let isTouch = false;
+let lightTimeout;
 
-// Add ripple effect to game card
+// Mouse move light effect
+document.addEventListener('mousemove', (e) => {
+    if (!isTouch) {
+        clearTimeout(lightTimeout);
+        lightEffect.style.opacity = '1';
+        lightEffect.style.left = `${e.clientX}px`;
+        lightEffect.style.top = `${e.clientY}px`;
+        
+        // Start fade out timer
+        lightTimeout = setTimeout(() => {
+            lightEffect.style.opacity = '0';
+        }, 1000);
+    }
+});
+
+document.addEventListener('mouseleave', () => {
+    if (!isTouch) {
+        lightEffect.style.opacity = '0';
+    }
+});
+
+// Touch effect
+document.addEventListener('touchstart', (e) => {
+    isTouch = true;
+    const touch = e.touches[0];
+    clearTimeout(lightTimeout);
+    lightEffect.style.opacity = '1';
+    lightEffect.style.left = `${touch.clientX}px`;
+    lightEffect.style.top = `${touch.clientY}px`;
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+    const touch = e.touches[0];
+    lightEffect.style.left = `${touch.clientX}px`;
+    lightEffect.style.top = `${touch.clientY}px`;
+}, { passive: true });
+
+document.addEventListener('touchend', () => {
+    lightTimeout = setTimeout(() => {
+        lightEffect.style.opacity = '0';
+    }, 1000);
+});
+
+// Game card navigation
 const gameCard = document.querySelector('.game-card');
 gameCard.addEventListener('click', () => {
     window.location.href = 'tictactoe/index.html';
@@ -71,3 +109,13 @@ window.addEventListener('resize', () => {
         }
     }
 });
+
+// Game configurations
+const games = {
+    tictactoe: {
+        name: 'Tic Tac Toe',
+        path: '/games/tictactoe/',
+        description: 'Classic two-player game'
+    }
+    // Add more games here
+};
