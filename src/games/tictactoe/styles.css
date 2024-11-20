@@ -1,0 +1,165 @@
+:root {
+    --bg-color: #000000;
+    --text-color: #FFFFFF;
+    --x-color: #FF4B6E;
+    --o-color: #4B9EFF;
+    --cell-size: 110px;
+    --board-gap: 12px;
+    --card-bg: rgba(255, 255, 255, 0.01);
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.game-wrapper {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.game-content {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 15px;
+    margin-top: calc(-1 * (var(--cell-size) + var(--board-gap)));
+}
+
+.turn-indicator {
+    font-size: 32px;
+    font-weight: 600;
+    padding: 16px 32px;
+    border-radius: 16px;
+    background: var(--card-bg);
+    text-align: center;
+    transition: color 0.3s ease;
+    white-space: nowrap;
+    justify-self: center;
+}
+
+.turn-indicator.x {
+    color: var(--x-color);
+}
+
+.turn-indicator.o {
+    color: var(--o-color);
+}
+
+.game-board {
+    display: grid;
+    grid-template-columns: repeat(3, var(--cell-size));
+    grid-template-rows: repeat(3, var(--cell-size));
+    gap: var(--board-gap);
+    background: var(--card-bg);
+    padding: var(--board-gap);
+    border-radius: 20px;
+    position: relative;
+    justify-self: center;
+}
+
+.board-cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    position: relative;
+}
+
+.board-cell:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.board-cell.x,
+.board-cell.o {
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 70%;
+}
+
+.board-cell.x {
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20L80 80M80 20L20 80' stroke='%23FF4B6E' stroke-width='12' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+.board-cell.o {
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='50' cy='50' r='35' stroke='%234B9EFF' stroke-width='12'/%3E%3C/svg%3E");
+}
+
+.win-line {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.2);
+    transition: transform 0.3s ease;
+    z-index: 1;
+    opacity: 0;
+}
+
+.win-line.horizontal {
+    height: 8px;
+    width: calc(100% - var(--board-gap) * 2);
+    left: var(--board-gap);
+    border-radius: 4px;
+}
+
+.win-line.vertical {
+    width: 8px;
+    height: calc(100% - var(--board-gap) * 2);
+    top: var(--board-gap);
+    border-radius: 4px;
+}
+
+.win-line.diagonal {
+    height: 8px;
+    width: calc(100% * 1.4142);
+    border-radius: 4px;
+    left: 50%;
+    top: 50%;
+}
+
+.light {
+    position: fixed;
+    width: 800px;
+    height: 800px;
+    pointer-events: none;
+    background: radial-gradient(
+        circle at center,
+        rgba(255, 255, 255, 0.1) 0%,
+        rgba(255, 255, 255, 0) 50%
+    );
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 0;
+}
+
+@media (max-width: 480px) {
+    :root {
+        --cell-size: 100px;
+        --board-gap: 10px;
+    }
+    
+    .game-content {
+        margin-top: calc(-1 * (var(--cell-size) + var(--board-gap)));
+    }
+    
+    .turn-indicator {
+        font-size: 28px;
+        padding: 12px 24px;
+    }
+    
+    .board-cell {
+        font-size: 56px;
+    }
+}

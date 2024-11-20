@@ -69,7 +69,7 @@ function resetEffects() {
     });
 }
 
-// Event listeners
+// Event listeners for effects
 document.addEventListener('mousemove', (e) => {
     if (!isTouch) updateEffects(e.clientX, e.clientY);
 });
@@ -80,23 +80,27 @@ document.addEventListener('mouseleave', () => {
 
 document.addEventListener('touchstart', (e) => {
     isTouch = true;
-    updateEffects(e.touches[0].clientX, e.touches[0].clientY);
+    const touch = e.touches[0];
+    updateEffects(touch.clientX, touch.clientY);
 }, { passive: true });
 
 document.addEventListener('touchmove', (e) => {
-    updateEffects(e.touches[0].clientX, e.touches[0].clientY);
+    const touch = e.touches[0];
+    updateEffects(touch.clientX, touch.clientY);
 }, { passive: true });
 
 document.addEventListener('touchend', resetEffects);
 
-// Navigation
-document.querySelector('.action-card').addEventListener('click', () => {
-    window.location.href = 'tictactoe/index.html';
+// Game navigation
+document.getElementById('play-ai').addEventListener('click', () => {
+    window.location.href = 'tictactoe/index.html?mode=ai';
 });
 
-tg.BackButton.onClick(() => window.history.back());
+document.getElementById('play-friend').addEventListener('click', () => {
+    window.location.href = 'tictactoe/index.html?mode=friend';
+});
 
-// Visibility and resize handling
+// Handle visibility and resize
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) resetEffects();
 });
@@ -107,6 +111,9 @@ window.addEventListener('resize', () => {
         grid.style.gridTemplateColumns = window.innerWidth < 768 ? '1fr' : 'repeat(auto-fit, minmax(280px, 1fr))';
     }
 });
+
+// Navigation
+tg.BackButton.onClick(() => window.history.back());
 
 // Game configurations
 const games = {
