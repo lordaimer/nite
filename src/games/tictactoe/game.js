@@ -67,19 +67,19 @@ function showWinLine(pattern) {
     // Calculate the angle and position for the win line
     if (a % 3 === 0 && b % 3 === 1 && c % 3 === 2) {
         // Horizontal line
-        winLine.style.width = '100%';
+        winLine.style.width = '95%';
         winLine.style.height = '8px';
         // Position at the vertical center of each row (33.33% per row)
         winLine.style.top = `calc(${Math.floor(a / 3) * 33.33}% + 16.665%)`;
-        winLine.style.left = '0';
+        winLine.style.left = '2.5%'; // Center the shortened line
         winLine.style.transform = 'translateY(-50%)';
     } else if (a % 3 === b % 3 && b % 3 === c % 3) {
         // Vertical line
         winLine.style.width = '8px';
-        winLine.style.height = '100%';
+        winLine.style.height = '95%';
         // Position at the horizontal center of each column (33.33% per column)
         winLine.style.left = `calc(${a % 3 * 33.33}% + 16.665%)`;
-        winLine.style.top = '0';
+        winLine.style.top = '2.5%'; // Center the shortened line
         winLine.style.transform = 'translateX(-50%)';
     } else {
         // Diagonal line - different sizes for X and O
