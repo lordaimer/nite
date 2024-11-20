@@ -7,6 +7,9 @@ tg.MainButton.hide();
 
 document.body.classList.add(`tg-theme-${tg.colorScheme}`);
 
+// Get user's first name
+const playerName = tg.initDataUnsafe?.user?.first_name || 'Player';
+
 // Game elements
 const board = document.querySelector('.game-board');
 const cells = document.querySelectorAll('.board-cell');
@@ -42,7 +45,7 @@ function resetGame() {
 
 function updateTurnIndicator() {
     if (!gameActive) return;
-    const playerText = currentPlayer === 'x' ? 'Your' : (isAIMode ? 'Nite\'s' : 'Player O\'s');
+    const playerText = currentPlayer === 'x' ? `${playerName}'s` : (isAIMode ? 'Nite\'s' : 'Player O\'s');
     turnIndicator.textContent = `${playerText} turn`;
     turnIndicator.className = `turn-indicator ${currentPlayer}`;
 }
@@ -111,7 +114,9 @@ function handleCellClick(index) {
     if (result) {
         gameActive = false;
         showWinLine(result.pattern);
-        turnIndicator.textContent = currentPlayer === 'x' ? 'You win!' : (isAIMode ? 'Nite wins!' : 'Player O wins!');
+        turnIndicator.textContent = currentPlayer === 'x' ? `${playerName} wins!` : (isAIMode ? 'Nite wins!' : 'Player O wins!');
+        const restartButton = document.querySelector('.restart-button');
+        restartButton.style.display = 'block';
     } else if (!gameBoard.includes('')) {
         gameActive = false;
         turnIndicator.textContent = "It's a draw!";
