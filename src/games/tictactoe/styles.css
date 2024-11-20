@@ -21,30 +21,29 @@ body {
 }
 
 .game-wrapper {
-    width: 100%;
-    height: 100vh;
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
+    min-height: 100vh;
 }
 
 .game-content {
-    display: grid;
-    grid-template-rows: auto 1fr;
-    gap: 15px;
-    margin-top: calc(-1 * (var(--cell-size) + var(--board-gap)));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    margin-top: -80px;
 }
 
 .turn-indicator {
-    font-size: 32px;
-    font-weight: 600;
-    padding: 16px 32px;
-    border-radius: 16px;
+    padding: 12px 24px;
+    border-radius: 12px;
     background: var(--card-bg);
+    color: var(--text-color);
+    font-size: 16px;
+    margin-bottom: 15px;
     text-align: center;
-    transition: color 0.3s ease;
-    white-space: nowrap;
-    justify-self: center;
 }
 
 .turn-indicator.x {
@@ -154,6 +153,33 @@ body {
     z-index: 0;
 }
 
+.restart-button {
+    padding: 12px 24px;
+    border-radius: 12px;
+    background: var(--card-bg);
+    color: var(--text-color);
+    font-size: 16px;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.3s ease;
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    bottom: -60px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.restart-button:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.restart-button[style*="display: block"] {
+    opacity: 1;
+    pointer-events: auto;
+}
+
 @media (max-width: 480px) {
     :root {
         --cell-size: 100px;
@@ -162,7 +188,7 @@ body {
     }
     
     .game-content {
-        margin-top: calc(-1 * (var(--cell-size) + var(--board-gap)));
+        margin-top: -80px;
     }
     
     .turn-indicator {
