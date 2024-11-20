@@ -4,14 +4,37 @@ dotenv.config();
 
 import TelegramBot from 'node-telegram-bot-api';
 import URLParse from 'url-parse';
+import express from 'express';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { setupTunnel } from './tunnel.js';
 
-// Import commands
+// Get the directory name of the current module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Create Express app
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Serve static files from the games directory
+app.use('/games', express.static(join(__dirname, 'games')));
+
+// Start the server and setup tunnel
+app.listen(PORT, '0.0.0.0', async () => {
+    console.log(`🎮 Game server is running on port ${PORT}`);
+    
+    // Setup ngrok tunnel
+    await setupTunnel();
+});
+
 import {
     setupAdminCommands,
     setupMemeCommand,
     setupImageCommand,
     setupMovieCommand,
     setupGameCommand,
+    setupGameAppCommand,
     setupDownloadCommand,
     setupTranscribeCommand,
     setupTimeCommand,
@@ -87,6 +110,7 @@ async function setupCommandsWithRateLimits() {
     setupImageCommand(bot, rateLimitService);
     setupMovieCommand(bot, rateLimitService);
     setupGameCommand(bot, rateLimitService);
+    setupGameAppCommand(bot, rateLimitService);
     setupDownloadCommand(bot, rateLimitService);
     setupTranscribeCommand(bot, rateLimitService, voiceService);
     setupWhatToWatchCommand(bot, rateLimitService);
