@@ -27,6 +27,19 @@ const winPatterns = [
     [0, 4, 8], [2, 4, 6]
 ];
 
+function resetGame() {
+    gameBoard = Array(9).fill('');
+    gameActive = true;
+    currentPlayer = 'x';
+    cells.forEach(cell => {
+        cell.className = 'board-cell';
+    });
+    const winLine = document.querySelector('.win-line');
+    winLine.className = 'win-line';
+    winLine.style.opacity = '0';
+    updateTurnIndicator();
+}
+
 function updateTurnIndicator() {
     if (!gameActive) return;
     const playerText = currentPlayer === 'x' ? 'Your' : (isAIMode ? 'AI\'s' : 'Player O\'s');
@@ -47,25 +60,34 @@ function checkWinner() {
 function showWinLine(pattern) {
     const winLine = document.querySelector('.win-line');
     const [a, b, c] = pattern;
+    const cellSize = getComputedStyle(document.documentElement).getPropertyValue('--cell-size').trim();
+    const gap = getComputedStyle(document.documentElement).getPropertyValue('--board-gap').trim();
+    const gapSize = parseInt(gap);
     
     // Calculate the angle and position for the win line
     if (a % 3 === 0 && b % 3 === 1 && c % 3 === 2) {
         // Horizontal line
-        winLine.style.width = 'calc(100% - var(--board-gap) * 2)';
+        winLine.style.width = '100%';
         winLine.style.height = '8px';
-        winLine.style.top = `calc(${Math.floor(a / 3) * 100}% + ${Math.floor(a / 3) * 8}px + var(--board-gap))`;
-        winLine.style.left = 'var(--board-gap)';
+        // Position at the vertical center of each row (33.33% per row)
+        winLine.style.top = `calc(${Math.floor(a / 3) * 33.33}% + 16.665%)`;
+        winLine.style.left = '0';
         winLine.style.transform = 'translateY(-50%)';
     } else if (a % 3 === b % 3 && b % 3 === c % 3) {
         // Vertical line
         winLine.style.width = '8px';
-        winLine.style.height = 'calc(100% - var(--board-gap) * 2)';
-        winLine.style.left = `calc(${a % 3 * 100}% + ${a % 3 * 8}px + var(--board-gap))`;
-        winLine.style.top = 'var(--board-gap)';
+        winLine.style.height = '100%';
+        // Position at the horizontal center of each column (33.33% per column)
+        winLine.style.left = `calc(${a % 3 * 33.33}% + 16.665%)`;
+        winLine.style.top = '0';
         winLine.style.transform = 'translateX(-50%)';
     } else {
-        // Diagonal line
-        winLine.style.width = 'calc(100% * 1.4142)';
+        // Diagonal line - different sizes for X and O
+        if (currentPlayer === 'x') {
+            winLine.style.width = '140%';  // Longer for X
+        } else {
+            winLine.style.width = '130%';  // Shorter for O
+        }
         winLine.style.height = '8px';
         winLine.style.top = '50%';
         winLine.style.left = '50%';
@@ -74,6 +96,8 @@ function showWinLine(pattern) {
             'translate(-50%, -50%) rotate(-45deg)';
     }
     
+    // Add the winner's class to the win line
+    winLine.className = 'win-line ' + currentPlayer;
     winLine.style.opacity = '1';
 }
 
@@ -91,6 +115,8 @@ function handleCellClick(index) {
     } else if (!gameBoard.includes('')) {
         gameActive = false;
         turnIndicator.textContent = "It's a draw!";
+        // Auto restart after 1.5 seconds on draw
+        setTimeout(resetGame, 1500);
     } else {
         currentPlayer = currentPlayer === 'x' ? 'o' : 'x';
         updateTurnIndicator();
