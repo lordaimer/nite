@@ -25,6 +25,24 @@ body {
     position: relative;
 }
 
+/* Global light source */
+#global-light {
+    position: fixed;
+    bottom: -80%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 200vw;
+    height: 200vw;
+    background: radial-gradient(circle, 
+        rgba(255, 255, 255, 0.06) 0%,
+        rgba(255, 255, 255, 0.045) 20%,
+        rgba(255, 255, 255, 0.03) 40%,
+        transparent 70%
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
 /* Light effect */
 #light-effect {
     position: fixed;
