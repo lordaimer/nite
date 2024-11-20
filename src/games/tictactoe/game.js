@@ -16,6 +16,7 @@ const cells = document.querySelectorAll('.board-cell');
 const turnIndicator = document.querySelector('.turn-indicator');
 const light = document.querySelector('.light');
 let isTouch = false;
+const restartButton = document.querySelector('.restart-button');
 
 // Game state
 let currentPlayer = 'x';
@@ -31,15 +32,14 @@ const winPatterns = [
 ];
 
 function resetGame() {
-    gameBoard = Array(9).fill('');
+    gameBoard = ['', '', '', '', '', '', '', '', ''];
     gameActive = true;
     currentPlayer = 'x';
     cells.forEach(cell => {
         cell.className = 'board-cell';
     });
-    const winLine = document.querySelector('.win-line');
-    winLine.className = 'win-line';
-    winLine.style.opacity = '0';
+    document.querySelector('.win-line').style.opacity = '0';
+    restartButton.style.display = 'none';
     updateTurnIndicator();
 }
 
@@ -115,7 +115,6 @@ function handleCellClick(index) {
         gameActive = false;
         showWinLine(result.pattern);
         turnIndicator.textContent = currentPlayer === 'x' ? `${playerName} wins!` : (isAIMode ? 'Nite wins!' : 'Player O wins!');
-        const restartButton = document.querySelector('.restart-button');
         restartButton.style.display = 'block';
     } else if (!gameBoard.includes('')) {
         gameActive = false;
@@ -185,6 +184,11 @@ function findWinningMove(player) {
 // Initialize game
 cells.forEach((cell, index) => {
     cell.addEventListener('click', () => handleCellClick(index));
+    cell.addEventListener('touchstart', () => {
+        isTouch = true;
+    }, { passive: true });
 });
+
+restartButton.addEventListener('click', resetGame);
 
 updateTurnIndicator();
