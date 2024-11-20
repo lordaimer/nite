@@ -12,10 +12,18 @@ window.fetch = function(url, options = {}) {
 
 // Initialize Telegram WebApp
 const tg = window.Telegram.WebApp;
-tg.expand();
 
-// Hide the main button
+// Expand to full height and hide bot name in footer
+tg.expand();
+tg.setHeaderColor('secondary_bg_color');
+tg.setBackgroundColor('secondary_bg_color');
+
+// Hide the main button and bot name in footer
 tg.MainButton.hide();
+if (tg.platform !== 'unknown') {
+    document.documentElement.style.setProperty('--tg-footer-height', '0px');
+    document.documentElement.classList.add('no-footer');
+}
 
 // Set theme class on body
 document.body.classList.add(`tg-theme-${tg.colorScheme}`);
@@ -30,59 +38,10 @@ const games = {
     // Add more games here
 };
 
-// Game selection handling
-document.querySelectorAll('.game-card').forEach(card => {
-    const gameType = card.dataset.game;
-    if (!gameType) return; // Skip if no game type (coming soon cards)
-    
-    const button = card.querySelector('.play-button');
-    if (!button) return;
-
-    button.addEventListener('click', () => {
-        // Add pressed animation
-        button.style.transform = 'scale(0.95)';
-        setTimeout(() => button.style.transform = '', 200);
-
-        // Handle game selection
-        const game = games[gameType];
-        if (game) {
-            // Get the base URL
-            const baseUrl = window.location.href.split('/games/')[0];
-            const gameUrl = `${baseUrl}${game.path}`;
-            
-            // Navigate to the game
-            window.location.href = gameUrl;
-        } else {
-            console.warn('Unknown game type:', gameType);
-        }
-    });
-});
-
-// Make game cards interactive
-document.querySelectorAll('.game-card').forEach(card => {
-    card.addEventListener('click', () => {
-        const game = card.dataset.game;
-        if (game === 'tictactoe') {
-            window.location.href = 'tictactoe/index.html';
-        }
-    });
-});
-
-// Add card hover effects
-document.querySelectorAll('.game-card').forEach(card => {
-    card.addEventListener('mouseover', () => {
-        const inner = card.querySelector('.game-card-inner');
-        if (inner) {
-            inner.style.transform = 'translateY(-5px)';
-        }
-    });
-
-    card.addEventListener('mouseout', () => {
-        const inner = card.querySelector('.game-card-inner');
-        if (inner) {
-            inner.style.transform = '';
-        }
-    });
+// Add ripple effect to game card
+const gameCard = document.querySelector('.game-card');
+gameCard.addEventListener('click', () => {
+    window.location.href = 'tictactoe/index.html';
 });
 
 // Handle back button
