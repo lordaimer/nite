@@ -62,35 +62,31 @@ function checkWinner() {
 
 function showWinLine(pattern) {
     const winLine = document.querySelector('.win-line');
-    const [a, b, c] = pattern;
-    const cellSize = getComputedStyle(document.documentElement).getPropertyValue('--cell-size').trim();
-    const gap = getComputedStyle(document.documentElement).getPropertyValue('--board-gap').trim();
-    const gapSize = parseInt(gap);
-    
-    // Calculate the angle and position for the win line
-    if (a % 3 === 0 && b % 3 === 1 && c % 3 === 2) {
-        // Horizontal line
-        winLine.style.width = '95%';
+    const a = pattern[0];
+    const c = pattern[2];
+
+    // Horizontal win
+    if (a === c - 2) {
+        winLine.style.width = '92%'; // Slightly shorter than 95%
         winLine.style.height = '8px';
-        // Position at the vertical center of each row (33.33% per row)
-        winLine.style.top = `calc(${Math.floor(a / 3) * 33.33}% + 16.665%)`;
-        winLine.style.left = '2.5%'; // Center the shortened line
-        winLine.style.transform = 'translateY(-50%)';
-    } else if (a % 3 === b % 3 && b % 3 === c % 3) {
-        // Vertical line
+        const row = Math.floor(a / 3);
+        winLine.style.top = `calc(${row * 33.33}% + 16.665%)`;
+        winLine.style.left = '4%'; // Adjust for the shorter width
+        winLine.style.transform = 'none';
+    }
+    // Vertical win
+    else if (a === c - 6) {
         winLine.style.width = '8px';
-        winLine.style.height = '95%';
-        // Position at the horizontal center of each column (33.33% per column)
-        winLine.style.left = `calc(${a % 3 * 33.33}% + 16.665%)`;
-        winLine.style.top = '2.5%'; // Center the shortened line
-        winLine.style.transform = 'translateX(-50%)';
-    } else {
-        // Diagonal line - different sizes for X and O
-        if (currentPlayer === 'x') {
-            winLine.style.width = '140%';  // Longer for X
-        } else {
-            winLine.style.width = '130%';  // Shorter for O
-        }
+        winLine.style.height = '92%'; // Slightly shorter than 95%
+        const col = a % 3;
+        winLine.style.left = `calc(${col * 33.33}% + 16.665%)`;
+        winLine.style.top = '4%'; // Adjust for the shorter height
+        winLine.style.transform = 'none';
+    }
+    // Diagonal win
+    else {
+        const width = '128%'; // Reduced from 133%
+        winLine.style.width = width;
         winLine.style.height = '8px';
         winLine.style.top = '50%';
         winLine.style.left = '50%';
@@ -99,7 +95,6 @@ function showWinLine(pattern) {
             'translate(-50%, -50%) rotate(-45deg)';
     }
     
-    // Add the winner's class to the win line
     winLine.className = 'win-line ' + currentPlayer;
     winLine.style.opacity = '1';
 }

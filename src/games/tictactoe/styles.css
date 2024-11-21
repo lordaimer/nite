@@ -27,24 +27,31 @@ body {
     align-items: center;
     justify-content: center;
     min-height: 100vh;
-    z-index: 2;
 }
 
 .game-content {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-areas: 
+        "turn"
+        "board"
+        "button";
+    gap: 15px;
     align-items: center;
+    justify-items: center;
     position: relative;
-    margin-top: -80px;
+    /* Calculate offset to center the board: 
+       (turn indicator height + gap + button container height + gap) / 2 */
+    margin-top: calc(-1 * (48px + 15px + 48px + 15px) / 2);
+    height: calc(var(--board-size) + 180px); /* Fixed height to prevent shifting */
 }
 
 .turn-indicator {
+    grid-area: turn;
     padding: 12px 24px;
     border-radius: 12px;
     background: var(--card-bg);
     color: var(--text-color);
     font-size: 24px;
-    margin-bottom: 15px;
     text-align: center;
     border: 1px solid var(--border-color);
     width: calc(var(--board-size) + 30px);
@@ -60,6 +67,7 @@ body {
 }
 
 .game-board {
+    grid-area: board;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: var(--board-gap);
@@ -106,13 +114,43 @@ body {
     background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='50' cy='50' r='35' stroke='%234B9EFF' stroke-width='12'/%3E%3C/svg%3E");
 }
 
+.button-container {
+    grid-area: button;
+    height: 48px; /* Height of the button */
+    width: calc(var(--board-size) + 30px);
+}
+
+.restart-button {
+    padding: 12px 24px;
+    border-radius: 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    font-size: 24px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, opacity 0.3s ease;
+    opacity: 0;
+    pointer-events: none;
+    width: 100%;
+    box-sizing: border-box;
+    display: none;
+}
+
+.restart-button[style*="display: block"] {
+    opacity: 1;
+    pointer-events: auto;
+    display: block;
+}
+
 .win-line {
     position: absolute;
-    transition: all 0.3s ease;
-    z-index: 1;
+    background: currentColor;
     opacity: 0;
+    transition: opacity 0.3s ease;
+    height: 8px;
     border-radius: 4px;
-    pointer-events: none;
+    transform-origin: center;
+    z-index: 2;
 }
 
 .win-line.x {
@@ -124,7 +162,6 @@ body {
 }
 
 .win-line.horizontal {
-    height: 8px;
     width: calc(100% - var(--board-gap) * 2);
     left: var(--board-gap);
     border-radius: 4px;
@@ -138,11 +175,12 @@ body {
 }
 
 .win-line.diagonal {
-    height: 8px;
     width: calc(100% * 1.4142);
-    border-radius: 4px;
+    height: 8px;
     left: 50%;
     top: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 4px;
 }
 
 .light {
@@ -159,31 +197,6 @@ body {
     opacity: 0;
     transition: opacity 0.3s ease;
     z-index: 0;
-}
-
-.restart-button {
-    margin-top: 15px;
-    padding: 12px 24px;
-    border-radius: 12px;
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    color: var(--text-color);
-    font-size: 24px;
-    cursor: pointer;
-    transition: background-color 0.3s ease, opacity 0.3s ease;
-    opacity: 0;
-    pointer-events: none;
-    width: calc(var(--board-size) + 30px);
-    box-sizing: border-box;
-}
-
-.restart-button:hover {
-    background: rgba(255, 255, 255, 0.03);
-}
-
-.restart-button[style*="display: block"] {
-    opacity: 1;
-    pointer-events: auto;
 }
 
 /* Global light source */
@@ -237,7 +250,7 @@ body {
     }
     
     .game-content {
-        margin-top: -80px;
+        margin-top: calc(-1 * (48px + 15px + 48px + 15px) / 2);
     }
     
     .turn-indicator {
