@@ -7,6 +7,7 @@
     --board-gap: 12px;
     --board-size: 360px;
     --card-bg: rgba(255, 255, 255, 0.01);
+    --border-color: rgba(255, 255, 255, 0.05);
 }
 
 body {
@@ -26,6 +27,7 @@ body {
     align-items: center;
     justify-content: center;
     min-height: 100vh;
+    z-index: 2;
 }
 
 .game-content {
@@ -44,6 +46,7 @@ body {
     font-size: 16px;
     margin-bottom: 15px;
     text-align: center;
+    border: 1px solid var(--border-color);
 }
 
 .turn-indicator.x {
@@ -64,6 +67,7 @@ body {
     overflow: hidden;
     border-radius: 24px;
     background: rgba(255, 255, 255, 0.01);
+    border: 1px solid var(--border-color);
 }
 
 .board-cell {
@@ -77,6 +81,7 @@ body {
     cursor: pointer;
     transition: background-color 0.3s ease;
     position: relative;
+    border: 1px solid var(--border-color);
 }
 
 .board-cell:hover {
@@ -178,6 +183,49 @@ body {
 .restart-button[style*="display: block"] {
     opacity: 1;
     pointer-events: auto;
+}
+
+/* Global light source */
+#global-light {
+    position: fixed;
+    bottom: -20vh;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background: radial-gradient(circle at 50% 100%, 
+        rgba(255, 255, 255, 0.06) 0%,
+        rgba(255, 255, 255, 0.045) 35%,
+        rgba(255, 255, 255, 0.03) 65%,
+        transparent 90%
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Light effect */
+#light-effect {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+
+#light-effect .light {
+    position: absolute;
+    width: 800px;
+    height: 800px;
+    background: radial-gradient(circle, 
+        rgba(255, 255, 255, 0.03) 0%,
+        rgba(255, 255, 255, 0.02) 20%,
+        transparent 65%
+    );
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 0.15s ease;
 }
 
 @media (max-width: 480px) {

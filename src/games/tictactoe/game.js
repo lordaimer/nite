@@ -14,7 +14,7 @@ const playerName = tg.initDataUnsafe?.user?.first_name || 'Player';
 const board = document.querySelector('.game-board');
 const cells = document.querySelectorAll('.board-cell');
 const turnIndicator = document.querySelector('.turn-indicator');
-const light = document.querySelector('.light');
+const light = document.querySelector('#light-effect .light');
 let isTouch = false;
 const restartButton = document.querySelector('.restart-button');
 
@@ -180,6 +180,38 @@ function findWinningMove(player) {
     }
     return -1;
 }
+
+// Light effect handling
+function updateEffects(x, y) {
+    if (light) {
+        light.style.left = x + 'px';
+        light.style.top = y + 'px';
+        light.style.opacity = '1';
+    }
+}
+
+function resetEffects() {
+    if (light) {
+        light.style.opacity = '0';
+    }
+}
+
+// Event listeners for effects
+document.addEventListener('mousemove', (e) => {
+    if (!isTouch) updateEffects(e.clientX, e.clientY);
+});
+
+document.addEventListener('touchstart', () => {
+    isTouch = true;
+    resetEffects();
+});
+
+document.addEventListener('touchend', resetEffects);
+
+// Handle visibility and resize
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) resetEffects();
+});
 
 // Initialize game
 cells.forEach((cell, index) => {
