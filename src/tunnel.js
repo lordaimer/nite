@@ -11,7 +11,7 @@ async function setupTunnel() {
             authtoken: process.env.NGROK_AUTHTOKEN
         });
         
-        const miniAppUrl = `${url}/games`;
+        const miniAppUrl = `${url}/games/gamehub.html`;
         updateMiniAppUrl(miniAppUrl);
         
         return url;

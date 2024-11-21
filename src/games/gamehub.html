@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="ngrok-skip-browser-warning" content="true">
+    <meta name="user-agent" content="NiteGameHub/1.0">
+    <title>Nite Games</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="global-light"></div>
+    <div id="light-effect">
+        <div class="light"></div>
+    </div>
+    <div class="app-container">
+        <div class="cards-container">
+            <div class="game-card main-card">
+                <div class="glow-container"></div>
+                <div class="glow-effect"></div>
+                <div class="game-icon">
+                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M19 8H29M19 40H29M8 19V29M40 19V29M13 13L16 16M32 32L35 35M35 13L32 16M16 32L13 35M24 19V29M19 24H29" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <div class="game-content">
+                    <h2>Tic Tac Toe</h2>
+                    <p>Challenge your friends or play with Nite in the classic game of X's and O's</p>
+                </div>
+            </div>
+            <div class="game-card action-card" id="play-ai">
+                <div class="glow-container"></div>
+                <span class="play-text">Play with Nite</span>
+            </div>
+            <div class="game-card action-card" id="play-friend">
+                <div class="glow-container"></div>
+                <span class="play-text">Challenge Friend</span>
+            </div>
+        </div>
+    </div>
+    <script src="gamehub.js"></script>
+</body>
+</html>
