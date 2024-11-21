@@ -22,7 +22,6 @@ body {
 }
 
 .game-wrapper {
-    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -30,23 +29,18 @@ body {
 }
 
 .game-content {
-    display: grid;
-    grid-template-areas: 
-        "turn"
-        "board"
-        "button";
-    gap: 15px;
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-items: center;
-    position: relative;
-    /* Calculate offset to center the board: 
-       (turn indicator height + gap + button container height + gap) / 2 */
-    margin-top: calc(-1 * (48px + 15px + 48px + 15px) / 2);
-    height: calc(var(--board-size) + 180px); /* Fixed height to prevent shifting */
+    gap: 10px;
+}
+
+.top-spacer {
+    height: 40px;
+    flex-shrink: 0;
 }
 
 .turn-indicator {
-    grid-area: turn;
     padding: 12px 24px;
     border-radius: 12px;
     background: var(--card-bg);
@@ -67,7 +61,6 @@ body {
 }
 
 .game-board {
-    grid-area: board;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: var(--board-gap);
@@ -115,7 +108,6 @@ body {
 }
 
 .button-container {
-    grid-area: button;
     height: 48px; /* Height of the button */
     width: calc(var(--board-size) + 30px);
 }
@@ -250,7 +242,7 @@ body {
     }
     
     .game-content {
-        margin-top: calc(-1 * (48px + 15px + 48px + 15px) / 2);
+        margin-top: -80px;
     }
     
     .turn-indicator {
