@@ -1,0 +1,157 @@
+:root {
+    --background-color: #000000;
+    --card-bg: rgba(255, 255, 255, 0.01);
+    --border-color: rgba(255, 255, 255, 0.05);
+    --text-primary: #FFFFFF;
+    --text-secondary: rgba(255, 255, 255, 0.6);
+    --tg-footer-height: 0px !important;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100vh;
+    overflow: hidden;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-primary);
+    position: relative;
+}
+
+/* Global light source */
+#global-light {
+    position: fixed;
+    bottom: -20vh;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background: radial-gradient(circle at 50% 100%, 
+        rgba(255, 255, 255, 0.06) 0%,
+        rgba(255, 255, 255, 0.045) 35%,
+        rgba(255, 255, 255, 0.03) 65%,
+        transparent 90%
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Light effect */
+#light-effect {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.light {
+    position: absolute;
+    width: 800px;
+    height: 800px;
+    background: radial-gradient(circle, 
+        rgba(255, 255, 255, 0.03) 0%,
+        rgba(255, 255, 255, 0.02) 20%,
+        transparent 65%
+    );
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.app-container {
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    position: relative;
+    z-index: 2;
+}
+
+.cards-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 320px;
+}
+
+/* Card styles */
+.game-card {
+    width: 100%;
+    cursor: pointer;
+    position: relative;
+    border-radius: 20px;
+    background: var(--card-bg);
+    transition: transform 0.2s ease;
+}
+
+.main-card {
+    padding: 24px;
+    aspect-ratio: 4/3;
+}
+
+.action-card {
+    padding: 16px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Glow container for border effect */
+.glow-container {
+    position: absolute;
+    inset: -1px;
+    border-radius: 20px;
+    padding: 1px;
+    background: transparent;
+    mask: 
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    -webkit-mask: 
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    pointer-events: none;
+    transition: background 0.15s ease;
+}
+
+.game-icon {
+    margin-bottom: 20px;
+    color: var(--text-primary);
+    opacity: 0.8;
+}
+
+.game-content h2 {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+.game-content p {
+    color: var(--text-secondary);
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+.play-text {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.9;
+}

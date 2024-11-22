@@ -93,11 +93,11 @@ document.addEventListener('touchend', resetEffects);
 
 // Game navigation
 document.getElementById('play-ai').addEventListener('click', () => {
-    window.location.href = 'tictactoe/index.html?mode=ai';
+    window.location.href = 'tictactoe/tictactoe.html?mode=ai';
 });
 
 document.getElementById('play-friend').addEventListener('click', () => {
-    window.location.href = 'tictactoe/index.html?mode=friend';
+    window.location.href = 'tictactoe/tictactoe.html?mode=friend';
 });
 
 // Handle visibility and resize
