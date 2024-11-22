@@ -71,15 +71,32 @@ function resetEffects() {
     
     cards.forEach(card => {
         const glowContainer = card.querySelector('.glow-container');
-        // Only reset if the card is not being pressed
-        if (!card.matches(':active')) {
+        // Don't animate if it's an action card that's being clicked
+        if (card.matches('.action-card:active')) return;
+        
+        let progress = 0;
+        const animate = () => {
+            progress = Math.min(1, progress + 0.05); // Increased from 0.03 to 0.05 for faster animation
+            const easeInProgress = progress * progress; // Ease-in effect
+            
+            // Calculate opacities with bottom-to-top animation
+            const bottomOpacity = 0.2 * easeInProgress;
+            const middleOpacity = progress < 0.3 ? 0 : 0.15 * ((progress - 0.3) / 0.7);
+            const topOpacity = progress < 0.6 ? 0 : 0.1 * ((progress - 0.6) / 0.4);
+            
             glowContainer.style.background = `linear-gradient(
                 180deg,
-                rgba(255, 255, 255, 0.1) 0%,
-                rgba(255, 255, 255, 0.15) 50%,
-                rgba(255, 255, 255, 0.2) 100%
+                rgba(255, 255, 255, ${topOpacity}) 0%,
+                rgba(255, 255, 255, ${middleOpacity}) 50%,
+                rgba(255, 255, 255, ${bottomOpacity}) 100%
             )`;
-        }
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            }
+        };
+        
+        requestAnimationFrame(animate);
         card.style.background = 'var(--card-bg)';
     });
 }
