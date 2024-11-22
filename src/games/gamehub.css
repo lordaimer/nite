@@ -1,7 +1,7 @@
 :root {
     --background-color: #000000;
     --card-bg: rgba(255, 255, 255, 0.01);
-    --border-color: rgba(255, 255, 255, 0.05);
+    --border-color: rgba(255, 255, 255, 0.12);
     --text-primary: #FFFFFF;
     --text-secondary: rgba(255, 255, 255, 0.6);
     --tg-footer-height: 0px !important;
@@ -28,15 +28,16 @@ body {
 /* Global light source */
 #global-light {
     position: fixed;
-    bottom: -20vh;
+    bottom: -10vh;
     left: 0;
     width: 100%;
     height: 100vh;
     background: radial-gradient(circle at 50% 100%, 
-        rgba(255, 255, 255, 0.06) 0%,
-        rgba(255, 255, 255, 0.045) 35%,
-        rgba(255, 255, 255, 0.03) 65%,
-        transparent 90%
+        rgba(255, 255, 255, 0.12) 0%,
+        rgba(255, 255, 255, 0.08) 20%,
+        rgba(255, 255, 255, 0.04) 40%,
+        rgba(255, 255, 255, 0.02) 60%,
+        transparent 80%
     );
     pointer-events: none;
     z-index: 0;
@@ -58,8 +59,8 @@ body {
     width: 800px;
     height: 800px;
     background: radial-gradient(circle, 
-        rgba(255, 255, 255, 0.03) 0%,
-        rgba(255, 255, 255, 0.02) 20%,
+        rgba(255, 255, 255, 0.06) 0%,
+        rgba(255, 255, 255, 0.04) 20%,
         transparent 65%
     );
     border-radius: 50%;
@@ -115,15 +116,49 @@ body {
     inset: -1px;
     border-radius: 20px;
     padding: 1px;
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.1) 0%,
+        rgba(255, 255, 255, 0.15) 50%,
+        rgba(255, 255, 255, 0.2) 100%
+    );
+    mask: 
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+    transition: none;
+}
+
+.glow-container::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 20px;
+    padding: 1px;
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.05) 0%,
+        rgba(255, 255, 255, 0.1) 100%
+    );
+    mask: 
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    opacity: 0.5;
+    transition: none;
+}
+
+.glow-effect {
+    position: absolute;
+    inset: -1px;
+    border-radius: 20px;
+    padding: 1px;
     background: transparent;
     mask: 
         linear-gradient(#fff 0 0) content-box,
         linear-gradient(#fff 0 0);
     mask-composite: exclude;
-    -webkit-mask: 
-        linear-gradient(#fff 0 0) content-box,
-        linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
     pointer-events: none;
     transition: background 0.15s ease;
 }
