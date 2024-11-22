@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { rateLimitService } from '../../services/api/rateLimitService.js';
-import { initializeDatabases, addWatchedMovie, isMovieWatched, addToWatchlist, isInWatchlist, removeFromWatchlist } from '../../data/whattowatch/database.js';
+import { initializeDatabases, addWatchedMovie, isMovieWatched, addToWatchlist, isInWatchlist, removeFromWatchlist, addToNotInterested, isNotInterested } from '../../data/whattowatch/database.js';
 
 // Cache movie results to reduce API calls
 const movieCache = new Map();
@@ -154,38 +154,36 @@ function createRatingKeyboard() {
 
 // Create movie result keyboard
 async function createMovieResultKeyboard(movieId, genre, rating, userId) {
-    const isWatchlisted = await isInWatchlist(userId, movieId);
-    const watched = await isMovieWatched(userId, movieId);
-    
+    const [isWatched, inWatchlist, notWantToWatch] = await Promise.all([
+        isMovieWatched(userId, movieId),
+        isInWatchlist(userId, movieId),
+        isNotInterested(userId, movieId)
+    ]);
+
     const keyboard = {
         inline_keyboard: [
             [
                 {
-                    text: '🎲 Try Another',
+                    text: '🔄 Another Movie',
                     callback_data: `wtw_another_${genre}_${rating}`
+                },
+                {
+                    text: inWatchlist ? '📝 Remove from Watchlist' : '📝 Add to Watchlist',
+                    callback_data: inWatchlist ? `wtw_unwatchlist_${movieId}` : `wtw_watchlist_${movieId}`
+                }
+            ],
+            [
+                {
+                    text: isWatched ? '✅ Already Watched' : '👁️ Already Watched',
+                    callback_data: `wtw_watched_${movieId}`
+                },
+                {
+                    text: notWantToWatch ? '🚫 Not Interested' : '🚫 Not Interested',
+                    callback_data: `wtw_notinterested_${movieId}`
                 }
             ]
         ]
     };
-
-    // Add watchlist button
-    const watchlistButton = {
-        text: isWatchlisted ? '📝 Remove from Watchlist' : '📝 Add to Watchlist',
-        callback_data: isWatchlisted ? `wtw_unwatchlist_${movieId}` : `wtw_watchlist_${movieId}`
-    };
-
-    // Only add "Already Watched" button if movie is not already watched
-    if (!watched) {
-        keyboard.inline_keyboard.push([
-            {
-                text: '✅ Already Watched',
-                callback_data: `wtw_watched_${movieId}`
-            },
-            watchlistButton
-        ]);
-    } else {
-        keyboard.inline_keyboard.push([watchlistButton]);
-    }
 
     return keyboard;
 }
@@ -217,8 +215,6 @@ async function searchActorImdbId(actorName) {
 
 async function discoverMovie(genre, minRating, userId, maxRetries = 3) {
     let lastError = null;
-    let triedMovies = new Set();
-
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
             const selectedGenre = genre.toLowerCase() === 'random' ? 
@@ -253,50 +249,44 @@ async function discoverMovie(genre, minRating, userId, maxRetries = 3) {
                 throw new Error('No movies found matching the criteria');
             }
 
-            const movies = response.data.results;
-            
-            // Shuffle the movies array for more randomness
-            for (let i = movies.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [movies[i], movies[j]] = [movies[j], movies[i]];
+            // Filter out movies that are already watched, in watchlist, or not interested
+            const availableMovies = [];
+            for (const movie of response.data.results) {
+                const [watched, inWatchlist, notInterested] = await Promise.all([
+                    isMovieWatched(userId, movie.id.toString()),
+                    isInWatchlist(userId, movie.id.toString()),
+                    isNotInterested(userId, movie.id.toString())
+                ]);
+
+                if (!watched && !inWatchlist && !notInterested) {
+                    availableMovies.push(movie);
+                }
             }
 
-            // Try each movie until we find one that hasn't been watched
-            for (const movie of movies) {
-                // Skip if we've already tried this movie in a previous attempt
-                if (triedMovies.has(movie.id)) {
-                    continue;
-                }
-                triedMovies.add(movie.id);
-
-                // Check if movie has been watched
-                const isWatched = await isMovieWatched(userId, movie.id.toString());
-                if (isWatched) {
-                    continue;
-                }
-
-                // Get OMDB details for the unwatched movie
-                const omdbResponse = await axios.get(`http://www.omdbapi.com/`, {
-                    params: {
-                        apikey: process.env.OMDB_API_KEY,
-                        t: movie.title,
-                        y: new Date(movie.release_date).getFullYear()
-                    }
-                });
-
-                if (omdbResponse.data.Response === 'False') {
-                    continue;
-                }
-
-                return {
-                    tmdb: movie,
-                    omdb: omdbResponse.data
-                };
+            if (!availableMovies.length) {
+                throw new Error('No unwatched movies found');
             }
 
-            // If we've tried all movies on this page and found none unwatched, try another attempt
-            throw new Error('All movies on this page have been watched');
+            // Select a random movie from available ones
+            const selectedMovie = availableMovies[Math.floor(Math.random() * availableMovies.length)];
 
+            // Get OMDB details for the unwatched movie
+            const omdbResponse = await axios.get(`http://www.omdbapi.com/`, {
+                params: {
+                    apikey: process.env.OMDB_API_KEY,
+                    t: selectedMovie.title,
+                    y: new Date(selectedMovie.release_date).getFullYear()
+                }
+            });
+
+            if (omdbResponse.data.Response === 'False') {
+                continue;
+            }
+
+            return {
+                tmdb: selectedMovie,
+                omdb: omdbResponse.data
+            };
         } catch (error) {
             lastError = error;
             // If this is not our last attempt, continue to the next try
@@ -346,7 +336,7 @@ async function formatMovieInfo(movie) {
 ⏱️ 𝖱𝗎𝗇𝗍𝗂𝗆𝖾 : ${runtimeFormatted}
 🔊 𝖫𝖺𝗇𝗀𝗎𝖺𝗀𝖾 : ${movie.omdb.Language || 'N/A'}
 🎥 𝖣𝗂𝗋𝖾𝖼𝗍𝗈𝗋𝗌 : ${movie.omdb.Director || 'N/A'}
-🔆 𝖲𝗍𝖺𝗋𝗌 : ${formattedActors}
+🔆 𝗌𝗍𝖺𝗋𝗌 : ${formattedActors}
 
 🗒 𝖲𝗍𝗈𝗋𝗒𝗅𝗂𝗇𝖾 : <code>${movie.omdb.Plot || 'No plot available'}</code>`;
 
@@ -671,6 +661,75 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
                         } else {
                             await bot.answerCallbackQuery(callbackQuery.id, {
                                 text: '❌ Failed to remove from watchlist. Please try again.',
+                                show_alert: true
+                            });
+                        }
+                        return;
+
+                    case 'notinterested':
+                        const movieIdNotInterested = params[0];
+                        const notInterestedResult = await addToNotInterested(chatId, movieIdNotInterested);
+                        
+                        if (notInterestedResult.success) {
+                            // Update keyboard to show only "Added" button
+                            const updatedKeyboard = {
+                                inline_keyboard: [[
+                                    { text: '🚫 Not Interested', callback_data: 'dummy' }
+                                ]]
+                            };
+                            
+                            await bot.editMessageReplyMarkup(updatedKeyboard, {
+                                chat_id: chatId,
+                                message_id: messageId
+                            });
+
+                            // Show brief success message
+                            await bot.answerCallbackQuery(callbackQuery.id);
+
+                            // Wait for 1.5 seconds
+                            await new Promise(resolve => setTimeout(resolve, 1500));
+
+                            // Find and show a new movie
+                            try {
+                                const currentKeyboard = callbackQuery.message.reply_markup;
+                                const genre = currentKeyboard.inline_keyboard[0][0].callback_data.split('_')[2];
+                                const rating = currentKeyboard.inline_keyboard[0][0].callback_data.split('_')[3];
+
+                                const newMovie = await discoverMovie(genre, rating, chatId);
+                                if (newMovie.tmdb.poster_path && newMovie.tmdb.poster_path !== 'N/A') {
+                                    await bot.sendPhoto(chatId, `${TMDB_IMAGE_BASE}${newMovie.tmdb.poster_path}`, {
+                                        caption: await formatMovieInfo(newMovie),
+                                        parse_mode: 'HTML',
+                                        reply_markup: await createMovieResultKeyboard(newMovie.tmdb.id, genre, rating, chatId)
+                                    });
+                                    await bot.deleteMessage(chatId, messageId);
+                                } else {
+                                    const text = await formatMovieInfo(newMovie);
+                                    const keyboard = await createMovieResultKeyboard(newMovie.tmdb.id, genre, rating, chatId);
+                                    await bot.editMessageText(text, {
+                                        chat_id: chatId,
+                                        message_id: messageId,
+                                        parse_mode: 'HTML',
+                                        reply_markup: keyboard
+                                    });
+                                }
+                            } catch (error) {
+                                // If no more unwatched movies, inform the user
+                                if (error.message.includes('unwatched movie')) {
+                                    await bot.sendMessage(chatId, 
+                                        '❌ No more unwatched movies found in this category. Try another genre or rating!',
+                                        { parse_mode: 'HTML' }
+                                    );
+                                } else {
+                                    await bot.sendMessage(chatId,
+                                        '❌ Failed to find another movie. Please try again.',
+                                        { parse_mode: 'HTML' }
+                                    );
+                                }
+                            }
+                        } else {
+                            await bot.answerCallbackQuery(callbackQuery.id, {
+                                text: '❌ Failed to mark as not interested. Please try again.',
                                 show_alert: true
                             });
                         }
