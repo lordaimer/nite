@@ -64,7 +64,12 @@ function updateEffects(x, y) {
 function resetEffects() {
     light.style.opacity = '0';
     cards.forEach(card => {
-        card.querySelector('.glow-container').style.background = 'transparent';
+        card.querySelector('.glow-container').style.background = `linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.1) 0%,
+            rgba(255, 255, 255, 0.15) 50%,
+            rgba(255, 255, 255, 0.2) 100%
+        )`;
         card.style.background = 'var(--card-bg)';
     });
 }
