@@ -21,12 +21,15 @@ html, body {
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background-color: var(--background-color);
-    color: var(--text-primary);
-    position: relative;
-    display: flex;
+    margin: 0;
     min-height: 100vh;
+    background: var(--background-color);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    position: relative;
 }
 
 /* Global light source */
@@ -74,12 +77,15 @@ body {
 }
 
 .app-container {
-    flex: 1;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    position: relative;
-    z-index: 2;
+    min-height: 100vh;
+    width: 100%;
+    padding: 16px;
+    transform: translateY(-5%);
+    box-sizing: border-box;
 }
 
 .cards-container {
@@ -87,9 +93,9 @@ body {
     flex-direction: column;
     gap: 16px;
     width: 100%;
-    max-width: 320px;
+    max-width: 400px;
     padding: 15px;
-    margin: 0;
+    margin: 0 auto;
 }
 
 /* Card styles */
