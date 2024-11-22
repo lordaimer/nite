@@ -30,8 +30,9 @@ export async function initializeDatabases() {
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER NOT NULL,
                     movie_id TEXT NOT NULL,
+                    imdb_id TEXT,
+                    omdb_id TEXT,
                     movie_title TEXT NOT NULL,
-                    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(user_id, movie_id)
                 );
             `);
@@ -49,8 +50,9 @@ export async function initializeDatabases() {
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER NOT NULL,
                     movie_id TEXT NOT NULL,
+                    imdb_id TEXT,
+                    omdb_id TEXT,
                     movie_title TEXT NOT NULL,
-                    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(user_id, movie_id)
                 );
             `);
@@ -63,16 +65,42 @@ export async function initializeDatabases() {
     }
 }
 
-async function getMovieTitleFromTMDB(movieId) {
+// Get movie details from TMDB
+async function getMovieDetails(movieId) {
     try {
-        const response = await axios.get(`https://api.themoviedb.org/3/movie/${movieId}`, {
+        // Get TMDB movie details
+        const tmdbResponse = await axios.get(`https://api.themoviedb.org/3/movie/${movieId}`, {
             params: {
-                api_key: process.env.TMDB_API_KEY
+                api_key: process.env.TMDB_API_KEY,
+                append_to_response: 'external_ids'
             }
         });
-        return response.data.title;
+
+        const movieTitle = tmdbResponse.data.title;
+        const imdbId = tmdbResponse.data.external_ids?.imdb_id || null;
+
+        // Get OMDB details if IMDB ID is available
+        let omdbId = null;
+        if (imdbId) {
+            const omdbResponse = await axios.get(`http://www.omdbapi.com/`, {
+                params: {
+                    apikey: process.env.OMDB_API_KEY,
+                    i: imdbId
+                }
+            });
+            
+            if (omdbResponse.data.Response === 'True') {
+                omdbId = omdbResponse.data.imdbID; // Using IMDB ID as OMDB ID since they're the same
+            }
+        }
+
+        return {
+            title: movieTitle,
+            imdbId,
+            omdbId
+        };
     } catch (error) {
-        console.error('Error fetching movie title:', error);
+        console.error('Error getting movie details:', error);
         return null;
     }
 }
@@ -81,19 +109,25 @@ async function getMovieTitleFromTMDB(movieId) {
 export async function addWatchedMovie(userId, movieId) {
     const { watchedDb } = await initializeDatabases();
     try {
-        const movieTitle = await getMovieTitleFromTMDB(movieId);
-        if (!movieTitle) {
-            throw new Error('Could not fetch movie title');
+        // Check if movie is already watched
+        const existing = await isMovieWatched(userId, movieId);
+        if (existing) {
+            return { success: false, message: 'Movie is already in your watched list' };
+        }
+
+        const movieDetails = await getMovieDetails(movieId);
+        if (!movieDetails) {
+            return { success: false, message: 'Could not fetch movie details' };
         }
 
         await watchedDb.run(
-            'INSERT OR REPLACE INTO watched_movies (user_id, movie_id, movie_title) VALUES (?, ?, ?)',
-            [userId, movieId, movieTitle]
+            'INSERT INTO watched_movies (user_id, movie_id, imdb_id, omdb_id, movie_title) VALUES (?, ?, ?, ?, ?)',
+            [userId, movieId, movieDetails.imdbId, movieDetails.omdbId, movieDetails.title]
         );
-        return true;
+        return { success: true, message: 'Added to watched list' };
     } catch (error) {
         console.error('Error adding watched movie:', error);
-        return false;
+        return { success: false, message: 'Failed to add movie to watched list' };
     }
 }
 
@@ -101,7 +135,7 @@ export async function getWatchedMovies(userId) {
     const { watchedDb } = await initializeDatabases();
     try {
         return await watchedDb.all(
-            'SELECT * FROM watched_movies WHERE user_id = ? ORDER BY added_at DESC',
+            'SELECT * FROM watched_movies WHERE user_id = ? ORDER BY id DESC',
             [userId]
         );
     } catch (error) {
@@ -139,19 +173,19 @@ export async function addToWatchlist(userId, movieId) {
             return { success: false, message: 'Movie is already in your watchlist' };
         }
 
-        const movieTitle = await getMovieTitleFromTMDB(movieId);
-        if (!movieTitle) {
-            return { success: false, message: 'Could not fetch movie title' };
+        const movieDetails = await getMovieDetails(movieId);
+        if (!movieDetails) {
+            return { success: false, message: 'Could not fetch movie details' };
         }
 
         await watchlistDb.run(
-            'INSERT INTO watchlist (user_id, movie_id, movie_title) VALUES (?, ?, ?)',
-            [userId, movieId, movieTitle]
+            'INSERT INTO watchlist (user_id, movie_id, imdb_id, omdb_id, movie_title) VALUES (?, ?, ?, ?, ?)',
+            [userId, movieId, movieDetails.imdbId, movieDetails.omdbId, movieDetails.title]
         );
         return { success: true, message: 'Added to watchlist' };
     } catch (error) {
         console.error('Error adding to watchlist:', error);
-        return { success: false, message: 'Failed to add to watchlist' };
+        return { success: false, message: 'Failed to add movie to watchlist' };
     }
 }
 
@@ -173,7 +207,7 @@ export async function getWatchlist(userId) {
     const { watchlistDb } = await initializeDatabases();
     try {
         return await watchlistDb.all(
-            'SELECT * FROM watchlist WHERE user_id = ? ORDER BY added_at DESC',
+            'SELECT * FROM watchlist WHERE user_id = ? ORDER BY id DESC',
             [userId]
         );
     } catch (error) {
