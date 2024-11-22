@@ -516,6 +516,10 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
                         });
 
                         try {
+                            const currentKeyboard = callbackQuery.message.reply_markup;
+                            const genre = currentKeyboard.inline_keyboard[0][0].callback_data.split('_')[2];
+                            const rating = currentKeyboard.inline_keyboard[0][0].callback_data.split('_')[3];
+
                             const newMovie = await discoverMovie(params[0], params[1], chatId);
                             if (newMovie.tmdb.poster_path && newMovie.tmdb.poster_path !== 'N/A') {
                                 await bot.sendPhoto(chatId, `${TMDB_IMAGE_BASE}${newMovie.tmdb.poster_path}`, {
@@ -548,10 +552,62 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
                         const success = await addWatchedMovie(chatId, movieId);
                         
                         if (success) {
-                            await bot.answerCallbackQuery(callbackQuery.id, {
-                                text: '✅ Added to your watched movies!',
-                                show_alert: true
+                            // Update keyboard to show only "Added" button
+                            const updatedKeyboard = {
+                                inline_keyboard: [[
+                                    { text: '✅ Added', callback_data: 'dummy' }
+                                ]]
+                            };
+                            
+                            await bot.editMessageReplyMarkup(updatedKeyboard, {
+                                chat_id: chatId,
+                                message_id: messageId
                             });
+
+                            // Show brief success message
+                            await bot.answerCallbackQuery(callbackQuery.id);
+
+                            // Wait for 1.5 seconds
+                            await new Promise(resolve => setTimeout(resolve, 1500));
+
+                            // Find and show a new movie
+                            try {
+                                const currentKeyboard = callbackQuery.message.reply_markup;
+                                const genre = currentKeyboard.inline_keyboard[0][0].callback_data.split('_')[2];
+                                const rating = currentKeyboard.inline_keyboard[0][0].callback_data.split('_')[3];
+
+                                const newMovie = await discoverMovie(genre, rating, chatId);
+                                if (newMovie.tmdb.poster_path && newMovie.tmdb.poster_path !== 'N/A') {
+                                    await bot.sendPhoto(chatId, `${TMDB_IMAGE_BASE}${newMovie.tmdb.poster_path}`, {
+                                        caption: await formatMovieInfo(newMovie),
+                                        parse_mode: 'HTML',
+                                        reply_markup: await createMovieResultKeyboard(newMovie.tmdb.id, genre, rating, chatId)
+                                    });
+                                    await bot.deleteMessage(chatId, messageId);
+                                } else {
+                                    const text = await formatMovieInfo(newMovie);
+                                    const keyboard = await createMovieResultKeyboard(newMovie.tmdb.id, genre, rating, chatId);
+                                    await bot.editMessageText(text, {
+                                        chat_id: chatId,
+                                        message_id: messageId,
+                                        parse_mode: 'HTML',
+                                        reply_markup: keyboard
+                                    });
+                                }
+                            } catch (error) {
+                                // If no more unwatched movies, inform the user
+                                if (error.message.includes('unwatched movie')) {
+                                    await bot.sendMessage(chatId, 
+                                        '❌ No more unwatched movies found in this category. Try another genre or rating!',
+                                        { parse_mode: 'HTML' }
+                                    );
+                                } else {
+                                    await bot.sendMessage(chatId,
+                                        '❌ Failed to find another movie. Please try again.',
+                                        { parse_mode: 'HTML' }
+                                    );
+                                }
+                            }
                         } else {
                             await bot.answerCallbackQuery(callbackQuery.id, {
                                 text: '❌ Failed to add to watched movies. Please try again.',
