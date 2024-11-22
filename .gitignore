@@ -138,3 +138,5 @@ src/services/data/bugs.json
 temp
 src/data/botState.json
 src/data/bugs.json
+src/data/*.db 
+dbquery.js 

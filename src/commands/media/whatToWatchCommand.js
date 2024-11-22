@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { rateLimitService } from '../../services/api/rateLimitService.js';
+import { initializeDatabase, addWatchedMovie, isMovieWatched } from '../../data/database.js';
 
 // Cache movie results to reduce API calls
 const movieCache = new Map();
@@ -159,6 +160,10 @@ function createMovieResultKeyboard(imdbID, genre, rating) {
                 {
                     text: '🎲 Try Another',
                     callback_data: `wtw_another_${genre}_${rating}`
+                },
+                {
+                    text: '✅ Already Watched',
+                    callback_data: `wtw_watched_${imdbID}`
                 }
             ]
         ]
@@ -190,8 +195,10 @@ async function searchActorImdbId(actorName) {
     }
 }
 
-async function discoverMovie(genre, minRating, maxRetries = 3) {
+async function discoverMovie(genre, minRating, userId, maxRetries = 3) {
     let lastError = null;
+    let triedMovies = new Set();
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
             const selectedGenre = genre.toLowerCase() === 'random' ? 
@@ -208,6 +215,8 @@ async function discoverMovie(genre, minRating, maxRetries = 3) {
 
             const genreId = genreResponse.data.genres.find(g => g.name === genreName)?.id;
             
+            // Get multiple pages of results to have more options
+            const page = Math.floor(Math.random() * 5) + 1;
             const response = await axios.get(`${TMDB_BASE_URL}/discover/movie`, {
                 params: {
                     api_key: process.env.TMDB_API_KEY,
@@ -216,7 +225,7 @@ async function discoverMovie(genre, minRating, maxRetries = 3) {
                     'vote_count.gte': 100,
                     language: 'en-US',
                     include_adult: false,
-                    page: Math.floor(Math.random() * 5) + 1
+                    page: page
                 }
             });
 
@@ -225,31 +234,56 @@ async function discoverMovie(genre, minRating, maxRetries = 3) {
             }
 
             const movies = response.data.results;
-            const randomMovie = movies[Math.floor(Math.random() * movies.length)];
-
-            const omdbResponse = await axios.get(`http://www.omdbapi.com/`, {
-                params: {
-                    apikey: process.env.OMDB_API_KEY,
-                    t: randomMovie.title,
-                    y: new Date(randomMovie.release_date).getFullYear()
-                }
-            });
-
-            if (omdbResponse.data.Response === 'False') {
-                throw new Error('Movie details not found in OMDB');
+            
+            // Shuffle the movies array for more randomness
+            for (let i = movies.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [movies[i], movies[j]] = [movies[j], movies[i]];
             }
 
-            return {
-                tmdb: randomMovie,
-                omdb: omdbResponse.data
-            };
+            // Try each movie until we find one that hasn't been watched
+            for (const movie of movies) {
+                // Skip if we've already tried this movie in a previous attempt
+                if (triedMovies.has(movie.id)) {
+                    continue;
+                }
+                triedMovies.add(movie.id);
+
+                // Check if movie has been watched
+                const isWatched = await isMovieWatched(userId, movie.id.toString());
+                if (isWatched) {
+                    continue;
+                }
+
+                // Get OMDB details for the unwatched movie
+                const omdbResponse = await axios.get(`http://www.omdbapi.com/`, {
+                    params: {
+                        apikey: process.env.OMDB_API_KEY,
+                        t: movie.title,
+                        y: new Date(movie.release_date).getFullYear()
+                    }
+                });
+
+                if (omdbResponse.data.Response === 'False') {
+                    continue;
+                }
+
+                return {
+                    tmdb: movie,
+                    omdb: omdbResponse.data
+                };
+            }
+
+            // If we've tried all movies on this page and found none unwatched, try another attempt
+            throw new Error('All movies on this page have been watched');
+
         } catch (error) {
             lastError = error;
             // If this is not our last attempt, continue to the next try
             if (attempt < maxRetries - 1) {
                 continue;
             }
-            throw new Error(`Failed to find movie after ${maxRetries} attempts: ${lastError.message}`);
+            throw new Error(`Failed to find unwatched movie after ${maxRetries} attempts: ${lastError.message}`);
         }
     }
 }
@@ -300,6 +334,9 @@ async function formatMovieInfo(movie) {
 }
 
 export async function setupWhatToWatchCommand(bot, rateLimitService) {
+    // Initialize the database
+    await initializeDatabase();
+
     // Command handler for /whattowatch and /wtw
     bot.onText(/^\/(?:whattowatch|wtw)$/, async (msg) => {
         const chatId = msg.chat.id;
@@ -429,22 +466,23 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
                         });
 
                         try {
-                            const movie = await discoverMovie(selection.genre, selection.rating);
+                            const movie = await discoverMovie(selection.genre, selection.rating, chatId);
                             if (movie.tmdb.poster_path && movie.tmdb.poster_path !== 'N/A') {
                                 await bot.sendPhoto(chatId, `${TMDB_IMAGE_BASE}${movie.tmdb.poster_path}`, {
                                     caption: await formatMovieInfo(movie),
                                     parse_mode: 'HTML',
-                                    reply_markup: createMovieResultKeyboard(movie.tmdb.imdb_id, selection.genre, selection.rating)
+                                    reply_markup: createMovieResultKeyboard(movie.tmdb.id, selection.genre, selection.rating)
                                 });
                                 await bot.deleteMessage(chatId, messageId);
                             } else {
                                 text = await formatMovieInfo(movie);
-                                keyboard = createMovieResultKeyboard(movie.tmdb.imdb_id, selection.genre, selection.rating);
+                                keyboard = createMovieResultKeyboard(movie.tmdb.id, selection.genre, selection.rating);
                             }
                         } catch (error) {
-                            // If error occurs, show error message but keep the current movie and button
                             await bot.answerCallbackQuery(callbackQuery.id, {
-                                text: '❌ Failed to find a movie. Please try again.',
+                                text: error.message.includes('unwatched movie') ? 
+                                    '❌ No unwatched movies found in this category. Try another genre or rating!' :
+                                    '❌ Failed to find a movie. Please try again.',
                                 show_alert: true
                             });
                         }
@@ -458,17 +496,17 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
                         });
 
                         try {
-                            const newMovie = await discoverMovie(params[0], params[1]);
+                            const newMovie = await discoverMovie(params[0], params[1], chatId);
                             if (newMovie.tmdb.poster_path && newMovie.tmdb.poster_path !== 'N/A') {
                                 await bot.sendPhoto(chatId, `${TMDB_IMAGE_BASE}${newMovie.tmdb.poster_path}`, {
                                     caption: await formatMovieInfo(newMovie),
                                     parse_mode: 'HTML',
-                                    reply_markup: createMovieResultKeyboard(newMovie.tmdb.imdb_id, params[0], params[1])
+                                    reply_markup: createMovieResultKeyboard(newMovie.tmdb.id, params[0], params[1])
                                 });
                                 await bot.deleteMessage(chatId, messageId);
                             } else {
                                 const text = await formatMovieInfo(newMovie);
-                                const keyboard = createMovieResultKeyboard(newMovie.tmdb.imdb_id, params[0], params[1]);
+                                const keyboard = createMovieResultKeyboard(newMovie.tmdb.id, params[0], params[1]);
                                 await bot.editMessageText(text, {
                                     chat_id: chatId,
                                     message_id: messageId,
@@ -480,6 +518,23 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
                             // If error occurs, show error message but keep the current movie and button
                             await bot.answerCallbackQuery(callbackQuery.id, {
                                 text: '❌ Failed to find another movie. Please try again.',
+                                show_alert: true
+                            });
+                        }
+                        return;
+
+                    case 'watched':
+                        const movieId = params[0];
+                        const success = await addWatchedMovie(chatId, movieId);
+                        
+                        if (success) {
+                            await bot.answerCallbackQuery(callbackQuery.id, {
+                                text: '✅ Added to your watched movies!',
+                                show_alert: true
+                            });
+                        } else {
+                            await bot.answerCallbackQuery(callbackQuery.id, {
+                                text: '❌ Failed to add to watched movies. Please try again.',
                                 show_alert: true
                             });
                         }
