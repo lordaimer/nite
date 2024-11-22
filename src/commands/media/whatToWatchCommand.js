@@ -178,7 +178,7 @@ async function createMovieResultKeyboard(movieId, genre, rating, userId) {
                     callback_data: `wtw_watched_${movieId}`
                 },
                 {
-                    text: notWantToWatch ? '🚫 Not Interested' : '🚫 Not Interested',
+                    text: notWantToWatch ? 'Duly Noted ✏️' : '❌ Not Interested',
                     callback_data: `wtw_notinterested_${movieId}`
                 }
             ]
@@ -671,10 +671,10 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
                         const notInterestedResult = await addToNotInterested(chatId, movieIdNotInterested);
                         
                         if (notInterestedResult.success) {
-                            // Update keyboard to show only "Added" button
+                            // Update keyboard to show only "Duly Noted" button
                             const updatedKeyboard = {
                                 inline_keyboard: [[
-                                    { text: '🚫 Not Interested', callback_data: 'dummy' }
+                                    { text: 'Duly Noted ✏️', callback_data: 'dummy' }
                                 ]]
                             };
                             
