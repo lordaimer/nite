@@ -24,8 +24,11 @@ document.body.classList.add(`tg-theme-${tg.colorScheme}`);
 const cards = document.querySelectorAll('.game-card');
 const light = document.querySelector('.light');
 let isTouch = false;
+let isPressed = false;
 
 function updateEffects(x, y) {
+    if (isPressed) return; // Skip hover effects if button is being pressed
+    
     light.style.opacity = '1';
     light.style.left = `${x}px`;
     light.style.top = `${y}px`;
@@ -44,20 +47,22 @@ function updateEffects(x, y) {
         );
         const intensity = Math.max(0, 1 - (distanceFromBorder * 2.5));
 
-        glowContainer.style.background = `radial-gradient(
-            300px at ${mouseX}px ${mouseY}px,
-            rgba(255, 255, 255, ${0.25 * intensity}) 0%,
-            rgba(255, 255, 255, ${0.15 * intensity}) 25%,
-            rgba(255, 255, 255, ${0.05 * intensity}) 35%,
-            rgba(255, 255, 255, 0) 70%
-        )`;
+        if (!card.matches(':active')) { // Only update hover effect if not pressed
+            glowContainer.style.background = `radial-gradient(
+                300px at ${mouseX}px ${mouseY}px,
+                rgba(255, 255, 255, ${0.25 * intensity}) 0%,
+                rgba(255, 255, 255, ${0.15 * intensity}) 25%,
+                rgba(255, 255, 255, ${0.05 * intensity}) 35%,
+                rgba(255, 255, 255, 0) 70%
+            )`;
 
-        card.style.background = `radial-gradient(
-            circle at ${mouseX}px ${mouseY}px,
-            rgba(255, 255, 255, ${0.03 * intensity}) 0%,
-            rgba(255, 255, 255, 0.01) 50%,
-            rgba(255, 255, 255, 0.005) 100%
-        )`;
+            card.style.background = `radial-gradient(
+                circle at ${mouseX}px ${mouseY}px,
+                rgba(255, 255, 255, ${0.03 * intensity}) 0%,
+                rgba(255, 255, 255, 0.01) 50%,
+                rgba(255, 255, 255, 0.005) 100%
+            )`;
+        }
     });
 }
 
@@ -115,6 +120,26 @@ document.addEventListener('touchmove', (e) => {
 }, { passive: true });
 
 document.addEventListener('touchend', resetEffects);
+
+// Add mousedown and mouseup listeners
+cards.forEach(card => {
+    card.addEventListener('mousedown', () => {
+        isPressed = true;
+    });
+    
+    card.addEventListener('touchstart', () => {
+        isPressed = true;
+    });
+});
+
+// Global mouseup and touchend listeners
+document.addEventListener('mouseup', () => {
+    isPressed = false;
+});
+
+document.addEventListener('touchend', () => {
+    isPressed = false;
+});
 
 // Game navigation
 document.getElementById('play-ai').addEventListener('click', () => {

@@ -113,6 +113,27 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+    user-select: none;
+}
+
+.action-card .glow-container {
+    transition: background 0.1s ease-out;
+}
+
+.action-card:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease-out;
+}
+
+.action-card:active .glow-container {
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.25) 0%,
+        rgba(255, 255, 255, 0.3) 50%,
+        rgba(255, 255, 255, 0.35) 100%
+    );
 }
 
 /* Glow container for border effect */
