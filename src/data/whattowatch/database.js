@@ -8,9 +8,11 @@ import fs from 'fs/promises';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const watchedDbPath = path.join(__dirname, 'watched.db');
 const watchlistDbPath = path.join(__dirname, 'watchlist.db');
+const notInterestedDbPath = path.join(__dirname, 'not_interested.db');
 
 let watchedDb = null;
 let watchlistDb = null;
+let notInterestedDb = null;
 
 // Initialize both databases
 export async function initializeDatabases() {
@@ -58,7 +60,27 @@ export async function initializeDatabases() {
             `);
         }
 
-        return { watchedDb, watchlistDb };
+        // Initialize not interested database
+        if (!notInterestedDb) {
+            notInterestedDb = await open({
+                filename: notInterestedDbPath,
+                driver: sqlite3.Database
+            });
+
+            await notInterestedDb.exec(`
+                CREATE TABLE IF NOT EXISTS not_interested (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    movie_id TEXT NOT NULL,
+                    imdb_id TEXT,
+                    omdb_id TEXT,
+                    movie_title TEXT NOT NULL,
+                    UNIQUE(user_id, movie_id)
+                );
+            `);
+        }
+
+        return { watchedDb, watchlistDb, notInterestedDb };
     } catch (error) {
         console.error('Error initializing databases:', error);
         throw error;
@@ -226,6 +248,41 @@ export async function isInWatchlist(userId, movieId) {
         return !!result;
     } catch (error) {
         console.error('Error checking watchlist:', error);
+        return false;
+    }
+}
+
+// Not Interested Functions
+export async function addToNotInterested(userId, movieId) {
+    const { notInterestedDb } = await initializeDatabases();
+    try {
+        // Get movie details from TMDB
+        const movie = await getMovieDetails(movieId);
+        if (!movie) {
+            throw new Error('Failed to fetch movie details');
+        }
+
+        await notInterestedDb.run(
+            'INSERT OR REPLACE INTO not_interested (user_id, movie_id, imdb_id, omdb_id, movie_title) VALUES (?, ?, ?, ?, ?)',
+            [userId, movieId, movie.imdbId, movie.omdbId, movie.title]
+        );
+        return { success: true };
+    } catch (error) {
+        console.error('Error adding movie to not interested:', error);
+        return { success: false, message: 'Failed to add to not interested list' };
+    }
+}
+
+export async function isNotInterested(userId, movieId) {
+    const { notInterestedDb } = await initializeDatabases();
+    try {
+        const result = await notInterestedDb.get(
+            'SELECT 1 FROM not_interested WHERE user_id = ? AND movie_id = ?',
+            [userId, movieId]
+        );
+        return !!result;
+    } catch (error) {
+        console.error('Error checking not interested status:', error);
         return false;
     }
 }
