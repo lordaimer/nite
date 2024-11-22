@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { rateLimitService } from '../../services/api/rateLimitService.js';
-import { initializeDatabase, addWatchedMovie, isMovieWatched } from '../../data/database.js';
+import { initializeDatabases, addWatchedMovie, isMovieWatched, addToWatchlist, isInWatchlist, removeFromWatchlist } from '../../data/whattowatch/database.js';
 
 // Cache movie results to reduce API calls
 const movieCache = new Map();
@@ -153,21 +153,41 @@ function createRatingKeyboard() {
 }
 
 // Create movie result keyboard
-function createMovieResultKeyboard(imdbID, genre, rating) {
-    return {
+async function createMovieResultKeyboard(movieId, genre, rating, userId) {
+    const isWatchlisted = await isInWatchlist(userId, movieId);
+    const watched = await isMovieWatched(userId, movieId);
+    
+    const keyboard = {
         inline_keyboard: [
             [
                 {
                     text: '🎲 Try Another',
                     callback_data: `wtw_another_${genre}_${rating}`
-                },
-                {
-                    text: '✅ Already Watched',
-                    callback_data: `wtw_watched_${imdbID}`
                 }
             ]
         ]
     };
+
+    // Add watchlist button
+    const watchlistButton = {
+        text: isWatchlisted ? '📝 Remove from Watchlist' : '📝 Add to Watchlist',
+        callback_data: isWatchlisted ? `wtw_unwatchlist_${movieId}` : `wtw_watchlist_${movieId}`
+    };
+
+    // Only add "Already Watched" button if movie is not already watched
+    if (!watched) {
+        keyboard.inline_keyboard.push([
+            {
+                text: '✅ Already Watched',
+                callback_data: `wtw_watched_${movieId}`
+            },
+            watchlistButton
+        ]);
+    } else {
+        keyboard.inline_keyboard.push([watchlistButton]);
+    }
+
+    return keyboard;
 }
 
 async function searchActorImdbId(actorName) {
@@ -334,8 +354,8 @@ async function formatMovieInfo(movie) {
 }
 
 export async function setupWhatToWatchCommand(bot, rateLimitService) {
-    // Initialize the database
-    await initializeDatabase();
+    // Initialize the databases
+    await initializeDatabases();
 
     // Command handler for /whattowatch and /wtw
     bot.onText(/^\/(?:whattowatch|wtw)$/, async (msg) => {
@@ -471,12 +491,12 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
                                 await bot.sendPhoto(chatId, `${TMDB_IMAGE_BASE}${movie.tmdb.poster_path}`, {
                                     caption: await formatMovieInfo(movie),
                                     parse_mode: 'HTML',
-                                    reply_markup: createMovieResultKeyboard(movie.tmdb.id, selection.genre, selection.rating)
+                                    reply_markup: await createMovieResultKeyboard(movie.tmdb.id, selection.genre, selection.rating, chatId)
                                 });
                                 await bot.deleteMessage(chatId, messageId);
                             } else {
                                 text = await formatMovieInfo(movie);
-                                keyboard = createMovieResultKeyboard(movie.tmdb.id, selection.genre, selection.rating);
+                                keyboard = await createMovieResultKeyboard(movie.tmdb.id, selection.genre, selection.rating, chatId);
                             }
                         } catch (error) {
                             await bot.answerCallbackQuery(callbackQuery.id, {
@@ -501,12 +521,12 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
                                 await bot.sendPhoto(chatId, `${TMDB_IMAGE_BASE}${newMovie.tmdb.poster_path}`, {
                                     caption: await formatMovieInfo(newMovie),
                                     parse_mode: 'HTML',
-                                    reply_markup: createMovieResultKeyboard(newMovie.tmdb.id, params[0], params[1])
+                                    reply_markup: await createMovieResultKeyboard(newMovie.tmdb.id, params[0], params[1], chatId)
                                 });
                                 await bot.deleteMessage(chatId, messageId);
                             } else {
                                 const text = await formatMovieInfo(newMovie);
-                                const keyboard = createMovieResultKeyboard(newMovie.tmdb.id, params[0], params[1]);
+                                const keyboard = await createMovieResultKeyboard(newMovie.tmdb.id, params[0], params[1], chatId);
                                 await bot.editMessageText(text, {
                                     chat_id: chatId,
                                     message_id: messageId,
@@ -535,6 +555,66 @@ export async function setupWhatToWatchCommand(bot, rateLimitService) {
                         } else {
                             await bot.answerCallbackQuery(callbackQuery.id, {
                                 text: '❌ Failed to add to watched movies. Please try again.',
+                                show_alert: true
+                            });
+                        }
+                        return;
+
+                    case 'watchlist':
+                        const movieIdToWatch = params[0];
+                        const watchlistResult = await addToWatchlist(chatId, movieIdToWatch);
+                        
+                        if (watchlistResult.success) {
+                            // Update the keyboard to show "Remove from Watchlist"
+                            const currentKeyboard = callbackQuery.message.reply_markup;
+                            const genre = currentKeyboard.inline_keyboard[0][0].callback_data.split('_')[2];
+                            const rating = currentKeyboard.inline_keyboard[0][0].callback_data.split('_')[3];
+                            
+                            await bot.editMessageReplyMarkup(
+                                await createMovieResultKeyboard(movieIdToWatch, genre, rating, chatId),
+                                {
+                                    chat_id: chatId,
+                                    message_id: messageId
+                                }
+                            );
+                            
+                            await bot.answerCallbackQuery(callbackQuery.id, {
+                                text: '📝 Added to your watchlist!',
+                                show_alert: true
+                            });
+                        } else {
+                            await bot.answerCallbackQuery(callbackQuery.id, {
+                                text: watchlistResult.message,
+                                show_alert: true
+                            });
+                        }
+                        return;
+
+                    case 'unwatchlist':
+                        const movieIdToRemove = params[0];
+                        const removeResult = await removeFromWatchlist(chatId, movieIdToRemove);
+                        
+                        if (removeResult) {
+                            // Update the keyboard to show "Add to Watchlist"
+                            const currentKeyboard = callbackQuery.message.reply_markup;
+                            const genre = currentKeyboard.inline_keyboard[0][0].callback_data.split('_')[2];
+                            const rating = currentKeyboard.inline_keyboard[0][0].callback_data.split('_')[3];
+                            
+                            await bot.editMessageReplyMarkup(
+                                await createMovieResultKeyboard(movieIdToRemove, genre, rating, chatId),
+                                {
+                                    chat_id: chatId,
+                                    message_id: messageId
+                                }
+                            );
+                            
+                            await bot.answerCallbackQuery(callbackQuery.id, {
+                                text: '✅ Removed from your watchlist!',
+                                show_alert: true
+                            });
+                        } else {
+                            await bot.answerCallbackQuery(callbackQuery.id, {
+                                text: '❌ Failed to remove from watchlist. Please try again.',
                                 show_alert: true
                             });
                         }

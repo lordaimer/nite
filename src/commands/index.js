@@ -9,6 +9,7 @@ export { setupGameCommand } from './media/gameCommand.js';
 export { setupDownloadCommand } from './media/downloadCommand.js';
 export { setupTranscribeCommand } from './media/transcribeCommand.js';
 export { setupWhatToWatchCommand } from './media/whatToWatchCommand.js';
+export { setupWatchlistCommand } from './media/watchlistCommand.js';
 
 // Utility Commands
 export { setupTimeCommand } from './utility/timeCommand.js';
