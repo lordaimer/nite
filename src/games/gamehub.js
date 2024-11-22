@@ -71,13 +71,13 @@ function resetEffects() {
     
     cards.forEach(card => {
         const glowContainer = card.querySelector('.glow-container');
-        // Don't animate if it's an action card that's being clicked
-        if (card.matches('.action-card:active')) return;
+        // Skip animation for action cards (buttons)
+        if (card.classList.contains('action-card')) return;
         
         let progress = 0;
         const animate = () => {
-            progress = Math.min(1, progress + 0.05); // Increased from 0.03 to 0.05 for faster animation
-            const easeInProgress = progress * progress; // Ease-in effect
+            progress = Math.min(1, progress + 0.05);
+            const easeInProgress = progress * progress;
             
             // Calculate opacities with bottom-to-top animation
             const bottomOpacity = 0.2 * easeInProgress;
