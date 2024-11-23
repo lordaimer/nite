@@ -119,10 +119,6 @@ function createWatchlistKeyboard(movies, currentPage = 0) {
             {
                 text: `🎬 ${movie.movie_title}`,
                 callback_data: `wl_info_${movie.movie_id}`
-            },
-            {
-                text: '❌ Remove',
-                callback_data: `wl_remove_${movie.movie_id}`
             }
         ]);
     });
@@ -146,6 +142,24 @@ function createWatchlistKeyboard(movies, currentPage = 0) {
     }
 
     return keyboard;
+}
+
+// Create movie details keyboard
+function createMovieDetailsKeyboard(movieId) {
+    return {
+        inline_keyboard: [
+            [
+                {
+                    text: '⬅️ Back to Watchlist',
+                    callback_data: 'wl_back'
+                },
+                {
+                    text: '❌ Remove from Watchlist',
+                    callback_data: `wl_remove_${movieId}`
+                }
+            ]
+        ]
+    };
 }
 
 // Create back to watchlist keyboard
@@ -260,7 +274,7 @@ export async function setupWatchlistCommand(bot, rateLimitService) {
                         await bot.sendPhoto(chatId, movieInfo.poster, {
                             caption: movieInfo.info,
                             parse_mode: 'HTML',
-                            reply_markup: createBackKeyboard()
+                            reply_markup: createMovieDetailsKeyboard(movieId)
                         });
                         await bot.deleteMessage(chatId, messageId);
                     } else {
@@ -268,7 +282,7 @@ export async function setupWatchlistCommand(bot, rateLimitService) {
                             chat_id: chatId,
                             message_id: messageId,
                             parse_mode: 'HTML',
-                            reply_markup: createBackKeyboard()
+                            reply_markup: createMovieDetailsKeyboard(movieId)
                         });
                     }
                     await bot.answerCallbackQuery(callbackQuery.id);
