@@ -1,6 +1,63 @@
 import { getWatchlist, removeFromWatchlist } from '../../data/whattowatch/database.js';
+import axios from 'axios';
 
 const ITEMS_PER_PAGE = 5;
+const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+
+// Format movie information for display
+async function formatMovieInfo(movie) {
+    try {
+        // Get TMDB movie details
+        const tmdbResponse = await axios.get(`${TMDB_BASE_URL}/movie/${movie.movie_id}`, {
+            params: {
+                api_key: process.env.TMDB_API_KEY,
+                language: 'en-US'
+            }
+        });
+
+        // Get OMDB details
+        const omdbResponse = await axios.get(`http://www.omdbapi.com/`, {
+            params: {
+                apikey: process.env.OMDB_API_KEY,
+                t: movie.movie_title,
+                y: new Date(tmdbResponse.data.release_date).getFullYear()
+            }
+        });
+
+        const tmdbMovie = tmdbResponse.data;
+        const omdbMovie = omdbResponse.data;
+
+        const imdbUrl = `https://www.imdb.com/title/${tmdbMovie.imdb_id}`;
+        
+        // Convert runtime to hours and minutes
+        let runtimeFormatted = 'N/A';
+        if (omdbMovie.Runtime && omdbMovie.Runtime !== 'N/A') {
+            const minutes = parseInt(omdbMovie.Runtime);
+            if (!isNaN(minutes)) {
+                const hours = Math.floor(minutes / 60);
+                const remainingMins = minutes % 60;
+                runtimeFormatted = hours > 0 
+                    ? `${hours}h ${remainingMins}m`
+                    : `${remainingMins}m`;
+            }
+        }
+
+        const basicInfo = `📀 𝖳𝗂𝗍𝗅𝖾 : <a href="${imdbUrl}">${movie.movie_title}</a>\n\n` +
+            `🌟 𝖱𝖺𝗍𝗂𝗇𝗀 : ${omdbMovie.imdbRating || 'N/A'}/10\n` +
+            `📆 𝖱𝖾𝗅𝖾𝖺𝗌𝖾 : ${omdbMovie.Released || 'N/A'}\n` +
+            `🎭 𝖦𝖾𝗇𝗋𝖾 : ${omdbMovie.Genre || 'N/A'}\n` +
+            `⏱️ 𝖱𝗎𝗇𝗍𝗂𝗆𝖾 : ${runtimeFormatted}\n` +
+            `🔊 𝖫𝖺𝗇𝗀𝗎𝖺𝗀𝖾 : ${omdbMovie.Language || 'N/A'}\n` +
+            `🎥 𝖣𝗂𝗋𝖾𝖼𝗍𝗈𝗋𝗌 : ${omdbMovie.Director || 'N/A'}\n` +
+            `🔆 𝗌𝗍𝖺𝗋𝗌 : ${omdbMovie.Actors || 'N/A'}\n\n` +
+            `🗒 𝖲𝗍𝗈𝗋𝗒𝗅𝗂𝗇𝖾 : <code>${omdbMovie.Plot || 'No plot available'}</code>`;
+
+        return basicInfo;
+    } catch (error) {
+        console.error('Error formatting movie info:', error);
+        return 'Error retrieving movie information. Please try again later.';
+    }
+}
 
 function createWatchlistKeyboard(movies, currentPage = 0) {
     const keyboard = {
@@ -40,6 +97,20 @@ function createWatchlistKeyboard(movies, currentPage = 0) {
     }
 
     return keyboard;
+}
+
+// Create back to watchlist keyboard
+function createBackKeyboard() {
+    return {
+        inline_keyboard: [
+            [
+                {
+                    text: '⬅️ Back to Watchlist',
+                    callback_data: 'wl_back'
+                }
+            ]
+        ]
+    };
 }
 
 export async function setupWatchlistCommand(bot, rateLimitService) {
@@ -168,16 +239,27 @@ export async function setupWatchlistCommand(bot, rateLimitService) {
                 case 'info':
                     const movie = movies.find(m => m.movie_id === params[0]);
                     if (movie) {
-                        await bot.answerCallbackQuery(callbackQuery.id, {
-                            text: `🎬 ${movie.movie_title}\n📅 Added: ${new Date(movie.added_at).toLocaleDateString()}`,
-                            show_alert: true
-                        });
-                    } else {
-                        await bot.answerCallbackQuery(callbackQuery.id, {
-                            text: '❌ Movie not found in watchlist',
-                            show_alert: true
+                        const movieInfo = await formatMovieInfo(movie);
+                        await bot.editMessageText(movieInfo, {
+                            chat_id: chatId,
+                            message_id: messageId,
+                            parse_mode: 'HTML',
+                            disable_web_page_preview: false,
+                            reply_markup: createBackKeyboard()
                         });
                     }
+                    await bot.answerCallbackQuery(callbackQuery.id);
+                    break;
+
+                case 'back':
+                    const text = '🎬 *Your Watchlist*\nHere are the movies in your watchlist:';
+                    await bot.editMessageText(text, {
+                        chat_id: chatId,
+                        message_id: messageId,
+                        parse_mode: 'Markdown',
+                        reply_markup: createWatchlistKeyboard(movies)
+                    });
+                    await bot.answerCallbackQuery(callbackQuery.id);
                     break;
 
                 default:
@@ -187,9 +269,9 @@ export async function setupWatchlistCommand(bot, rateLimitService) {
                     });
             }
         } catch (error) {
-            console.error('Error in watchlist callback:', error);
+            console.error('Error in watchlist callback query:', error);
             await bot.answerCallbackQuery(callbackQuery.id, {
-                text: '❌ Something went wrong. Please try again.',
+                text: '❌ An error occurred. Please try again.',
                 show_alert: true
             });
         }
