@@ -59,6 +59,23 @@ ADMIN_USER_ID=your_admin_id
 node bot.js
 ```
 
+## Setup Cloudflared (Required for Games)
+
+To run the games feature, you'll need to set up Cloudflared:
+
+1. Download Cloudflared:
+   - Windows: Download [cloudflared-windows-amd64.exe](https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe)
+   - Linux: `wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64`
+   - Mac: `brew install cloudflare/cloudflare/cloudflared`
+
+2. Rename the downloaded file:
+   - Windows: Rename to `cloudflared.exe`
+   - Linux/Mac: Rename to `cloudflared`
+
+3. Place the file in your project root directory
+
+The tunnel will automatically start when you run the bot.
+
 ## 📝 Environment Variables
 
 - `TELEGRAM_BOT_TOKEN`: Your Telegram bot token
