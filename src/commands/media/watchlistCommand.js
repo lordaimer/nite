@@ -3,6 +3,7 @@ import axios from 'axios';
 
 const ITEMS_PER_PAGE = 5;
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
 
 // Format movie information for display
 async function formatMovieInfo(movie) {
@@ -42,20 +43,68 @@ async function formatMovieInfo(movie) {
             }
         }
 
-        const basicInfo = `📀 𝖳𝗂𝗍𝗅𝖾 : <a href="${imdbUrl}">${movie.movie_title}</a>\n\n` +
-            `🌟 𝖱𝖺𝗍𝗂𝗇𝗀 : ${omdbMovie.imdbRating || 'N/A'}/10\n` +
-            `📆 𝖱𝖾𝗅𝖾𝖺𝗌𝖾 : ${omdbMovie.Released || 'N/A'}\n` +
-            `🎭 𝖦𝖾𝗇𝗋𝖾 : ${omdbMovie.Genre || 'N/A'}\n` +
-            `⏱️ 𝖱𝗎𝗇𝗍𝗂𝗆𝖾 : ${runtimeFormatted}\n` +
-            `🔊 𝖫𝖺𝗇𝗀𝗎𝖺𝗀𝖾 : ${omdbMovie.Language || 'N/A'}\n` +
-            `🎥 𝖣𝗂𝗋𝖾𝖼𝗍𝗈𝗋𝗌 : ${omdbMovie.Director || 'N/A'}\n` +
-            `🔆 𝗌𝗍𝖺𝗋𝗌 : ${omdbMovie.Actors || 'N/A'}\n\n` +
-            `🗒 𝖲𝗍𝗈𝗋𝗒𝗅𝗂𝗇𝖾 : <code>${omdbMovie.Plot || 'No plot available'}</code>`;
+        // Format actors with IMDb links
+        let formattedActors = 'N/A';
+        if (omdbMovie.Actors && omdbMovie.Actors !== 'N/A') {
+            const actors = omdbMovie.Actors.split(', ');
+            const actorPromises = actors.map(async actor => {
+                const imdbId = await searchActorImdbId(actor);
+                return imdbId ? 
+                    `<a href="https://www.imdb.com/name/${imdbId}">${actor}</a>` : 
+                    actor;
+            });
+            const linkedActors = await Promise.all(actorPromises);
+            formattedActors = linkedActors.join(', ');
+        }
 
-        return basicInfo;
+        const basicInfo = `📀 𝖳𝗂𝗍𝗅𝖾 : <a href="${imdbUrl}">${movie.movie_title}</a>
+
+🌟 𝖱𝖺𝗍𝗂𝗇𝗀 : ${omdbMovie.imdbRating || 'N/A'}/10
+📆 𝖱𝖾𝗅𝖾𝖺𝗌𝖾 : ${omdbMovie.Released || 'N/A'}
+🎭 𝖦𝖾𝗇𝗋𝖾 : ${omdbMovie.Genre || 'N/A'}
+⏱️ 𝖱𝗎𝗇𝗍𝗂𝗆𝖾 : ${runtimeFormatted}
+🔊 𝖫𝖺𝗇𝗀𝗎𝖺𝗀𝖾 : ${omdbMovie.Language || 'N/A'}
+🎥 𝖣𝗂𝗋𝖾𝖼𝗍𝗈𝗋𝗌 : ${omdbMovie.Director || 'N/A'}
+🔆 𝗌𝗍𝖺𝗋𝗌 : ${formattedActors}
+
+🗒 𝖲𝗍𝗈𝗋𝗒𝗅𝗂𝗇𝖾 : <code>${omdbMovie.Plot || 'No plot available'}</code>`;
+
+        return {
+            info: basicInfo,
+            poster: tmdbMovie.poster_path ? `${TMDB_IMAGE_BASE}${tmdbMovie.poster_path}` : null
+        };
     } catch (error) {
         console.error('Error formatting movie info:', error);
-        return 'Error retrieving movie information. Please try again later.';
+        return {
+            info: 'Error retrieving movie information. Please try again later.',
+            poster: null
+        };
+    }
+}
+
+// Search for actor's IMDb ID using TMDB API
+async function searchActorImdbId(actorName) {
+    try {
+        const response = await axios.get(`${TMDB_BASE_URL}/search/person`, {
+            params: {
+                api_key: process.env.TMDB_API_KEY,
+                query: actorName,
+                language: 'en-US'
+            }
+        });
+
+        if (response.data.results && response.data.results.length > 0) {
+            const personId = response.data.results[0].id;
+            const personDetails = await axios.get(`${TMDB_BASE_URL}/person/${personId}/external_ids`, {
+                params: {
+                    api_key: process.env.TMDB_API_KEY
+                }
+            });
+            return personDetails.data.imdb_id;
+        }
+        return null;
+    } catch (error) {
+        return null;
     }
 }
 
@@ -195,16 +244,42 @@ export async function setupWatchlistCommand(bot, rateLimitService) {
                     await bot.answerCallbackQuery(callbackQuery.id);
                     break;
 
-                case 'remove':
+                case 'info':
                     const movieId = params[0];
-                    const success = await removeFromWatchlist(chatId, movieId);
+                    const movie = movies.find(m => m.movie_id === movieId);
+                    if (!movie) {
+                        await bot.answerCallbackQuery(callbackQuery.id, {
+                            text: '❌ Movie not found in watchlist.',
+                            show_alert: true
+                        });
+                        return;
+                    }
 
+                    const movieInfo = await formatMovieInfo(movie);
+                    if (movieInfo.poster) {
+                        await bot.sendPhoto(chatId, movieInfo.poster, {
+                            caption: movieInfo.info,
+                            parse_mode: 'HTML',
+                            reply_markup: createBackKeyboard()
+                        });
+                        await bot.deleteMessage(chatId, messageId);
+                    } else {
+                        await bot.editMessageText(movieInfo.info, {
+                            chat_id: chatId,
+                            message_id: messageId,
+                            parse_mode: 'HTML',
+                            reply_markup: createBackKeyboard()
+                        });
+                    }
+                    await bot.answerCallbackQuery(callbackQuery.id);
+                    break;
+
+                case 'remove':
+                    const removeId = params[0];
+                    const success = await removeFromWatchlist(chatId, removeId);
                     if (success) {
-                        // Get updated list
                         const updatedMovies = await getWatchlist(chatId);
-
                         if (updatedMovies.length === 0) {
-                            // If watchlist is empty, update the entire message
                             await bot.editMessageText(
                                 '📝 Your watchlist is empty. Use the "Add to Watchlist" button when viewing movie recommendations to add movies!',
                                 {
@@ -214,7 +289,6 @@ export async function setupWatchlistCommand(bot, rateLimitService) {
                                 }
                             );
                         } else {
-                            // Update the keyboard with remaining movies
                             await bot.editMessageReplyMarkup(
                                 createWatchlistKeyboard(updatedMovies),
                                 {
@@ -223,53 +297,40 @@ export async function setupWatchlistCommand(bot, rateLimitService) {
                                 }
                             );
                         }
-
                         await bot.answerCallbackQuery(callbackQuery.id, {
-                            text: '✅ Movie removed from your watchlist!',
+                            text: '✅ Movie removed from watchlist.',
                             show_alert: true
                         });
                     } else {
                         await bot.answerCallbackQuery(callbackQuery.id, {
-                            text: '❌ Failed to remove movie. Please try again.',
+                            text: '❌ Failed to remove movie from watchlist.',
                             show_alert: true
                         });
                     }
                     break;
 
-                case 'info':
-                    const movie = movies.find(m => m.movie_id === params[0]);
-                    if (movie) {
-                        const movieInfo = await formatMovieInfo(movie);
-                        await bot.editMessageText(movieInfo, {
-                            chat_id: chatId,
-                            message_id: messageId,
-                            parse_mode: 'HTML',
-                            disable_web_page_preview: false,
-                            reply_markup: createBackKeyboard()
-                        });
+                case 'back':
+                    const currentMovies = await getWatchlist(chatId);
+                    // Send a new message instead of editing the old one
+                    await bot.sendMessage(
+                        chatId,
+                        '🎬 *Your Watchlist*\nHere are the movies in your watchlist:',
+                        {
+                            parse_mode: 'Markdown',
+                            reply_markup: createWatchlistKeyboard(currentMovies)
+                        }
+                    );
+                    // Try to delete the previous message with movie details
+                    try {
+                        await bot.deleteMessage(chatId, messageId);
+                    } catch (error) {
+                        console.log('Could not delete previous message:', error.message);
                     }
                     await bot.answerCallbackQuery(callbackQuery.id);
                     break;
-
-                case 'back':
-                    const text = '🎬 *Your Watchlist*\nHere are the movies in your watchlist:';
-                    await bot.editMessageText(text, {
-                        chat_id: chatId,
-                        message_id: messageId,
-                        parse_mode: 'Markdown',
-                        reply_markup: createWatchlistKeyboard(movies)
-                    });
-                    await bot.answerCallbackQuery(callbackQuery.id);
-                    break;
-
-                default:
-                    await bot.answerCallbackQuery(callbackQuery.id, {
-                        text: '❌ Invalid action',
-                        show_alert: true
-                    });
             }
         } catch (error) {
-            console.error('Error in watchlist callback query:', error);
+            console.error('Error in watchlist callback:', error);
             await bot.answerCallbackQuery(callbackQuery.id, {
                 text: '❌ An error occurred. Please try again.',
                 show_alert: true
