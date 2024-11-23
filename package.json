@@ -37,7 +37,5 @@
     "url-parse": "^1.5.10",
     "ytdl-core": "^4.11.5"
   },
-  "devDependencies": {
-    "ngrok": "^5.0.0-beta.2"
-  }
+  "devDependencies": {}
 }

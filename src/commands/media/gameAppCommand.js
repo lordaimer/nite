@@ -1,9 +1,10 @@
 // We'll store the dynamic URL here
-let currentMiniAppUrl = process.env.MINI_APP_URL || 'https://your-mini-app-url.com';
+let currentMiniAppUrl = null;
 
 // Function to update the Mini App URL
 export function updateMiniAppUrl(newUrl) {
     currentMiniAppUrl = newUrl;
+    console.log('Mini App URL updated to:', newUrl);
 }
 
 async function handleCommand(bot, msg, rateLimitService) {
@@ -11,6 +12,16 @@ async function handleCommand(bot, msg, rateLimitService) {
     const userId = msg.from.id;
 
     try {
+        // Check if tunnel URL is ready
+        if (!currentMiniAppUrl) {
+            await bot.sendMessage(
+                chatId,
+                '⚠️ Game server is still starting up. Please try again in a few seconds.',
+                { parse_mode: 'Markdown' }
+            );
+            return;
+        }
+
         // Check rate limit if service is provided
         if (rateLimitService && !rateLimitService.check(userId, 'game_app', 10, 60000)) {
             await bot.sendMessage(
