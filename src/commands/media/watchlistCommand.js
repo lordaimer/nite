@@ -113,11 +113,11 @@ function createWatchlistKeyboard(movies, currentPage = 0) {
         inline_keyboard: []
     };
 
-    // Add movie buttons
+    // Add movie buttons with padding for visual left alignment
     movies.slice(currentPage * ITEMS_PER_PAGE, (currentPage + 1) * ITEMS_PER_PAGE).forEach(movie => {
         keyboard.inline_keyboard.push([
             {
-                text: `🎬 ${movie.movie_title}`,
+                text: `  🎬 ${movie.movie_title}`,
                 callback_data: `wl_info_${movie.movie_id}`
             }
         ]);
@@ -144,17 +144,17 @@ function createWatchlistKeyboard(movies, currentPage = 0) {
     return keyboard;
 }
 
-// Create movie details keyboard
-function createMovieDetailsKeyboard(movieId) {
+// Create movie details keyboard with current page information
+function createMovieDetailsKeyboard(movieId, currentPage = 0) {
     return {
         inline_keyboard: [
             [
                 {
-                    text: '⬅️ Back to Watchlist',
-                    callback_data: 'wl_back'
+                    text: '  ⬅️ Back to Watchlist',
+                    callback_data: `wl_back_${currentPage}`
                 },
                 {
-                    text: '❌ Remove from Watchlist',
+                    text: '  ❌ Remove from Watchlist',
                     callback_data: `wl_remove_${movieId}`
                 }
             ]
@@ -260,6 +260,27 @@ export async function setupWatchlistCommand(bot, rateLimitService) {
 
                 case 'info':
                     const movieId = params[0];
+                    // Get the current page from the keyboard if it exists
+                    const currentKeyboard = callbackQuery.message.reply_markup;
+                    let currentPage = 0;
+                    if (currentKeyboard && currentKeyboard.inline_keyboard) {
+                        // Check if there's a next/previous button and extract the page number
+                        const navigationRow = currentKeyboard.inline_keyboard[currentKeyboard.inline_keyboard.length - 1];
+                        if (navigationRow) {
+                            for (const button of navigationRow) {
+                                if (button.callback_data && button.callback_data.startsWith('wl_page_')) {
+                                    // If there's a "Previous" button, use its page number + 1
+                                    // If there's only a "Next" button, we're on page 0
+                                    const match = button.callback_data.match(/wl_page_(\d+)/);
+                                    if (match) {
+                                        currentPage = button.text.includes('Previous') ? parseInt(match[1]) + 1 : 0;
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
                     const movie = movies.find(m => m.movie_id === movieId);
                     if (!movie) {
                         await bot.answerCallbackQuery(callbackQuery.id, {
@@ -274,7 +295,7 @@ export async function setupWatchlistCommand(bot, rateLimitService) {
                         await bot.sendPhoto(chatId, movieInfo.poster, {
                             caption: movieInfo.info,
                             parse_mode: 'HTML',
-                            reply_markup: createMovieDetailsKeyboard(movieId)
+                            reply_markup: createMovieDetailsKeyboard(movieId, currentPage)
                         });
                         await bot.deleteMessage(chatId, messageId);
                     } else {
@@ -282,7 +303,7 @@ export async function setupWatchlistCommand(bot, rateLimitService) {
                             chat_id: chatId,
                             message_id: messageId,
                             parse_mode: 'HTML',
-                            reply_markup: createMovieDetailsKeyboard(movieId)
+                            reply_markup: createMovieDetailsKeyboard(movieId, currentPage)
                         });
                     }
                     await bot.answerCallbackQuery(callbackQuery.id);
@@ -324,17 +345,16 @@ export async function setupWatchlistCommand(bot, rateLimitService) {
                     break;
 
                 case 'back':
+                    const pageToReturn = params[0] ? parseInt(params[0]) : 0;
                     const currentMovies = await getWatchlist(chatId);
-                    // Send a new message instead of editing the old one
                     await bot.sendMessage(
                         chatId,
                         '🎬 *Your Watchlist*\nHere are the movies in your watchlist:',
                         {
                             parse_mode: 'Markdown',
-                            reply_markup: createWatchlistKeyboard(currentMovies)
+                            reply_markup: createWatchlistKeyboard(currentMovies, pageToReturn)
                         }
                     );
-                    // Try to delete the previous message with movie details
                     try {
                         await bot.deleteMessage(chatId, messageId);
                     } catch (error) {
