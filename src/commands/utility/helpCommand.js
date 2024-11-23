@@ -156,19 +156,22 @@ I am a versatile personal assistant bot currently under development.`;
         },
         {
             command: '/whattowatch, /wtw',
-            description: 'Get personalized movie and TV show recommendations',
-            usage: '/whattowatch',
-            examples: ['/whattowatch', '/wtw'],
+            description: 'Get personalized movie recommendations based on genre and rating',
+            usage: '/whattowatch or /wtw',
+            examples: [
+                '/whattowatch',
+                '/wtw'
+            ],
             category: 'Entertainment',
-            note: '\nUse the interactive buttons to refine your recommendations.'
+            note: '\nFeatures interactive buttons for genre and rating selection, watchlist management, and tracking watched movies.'
         },
         {
-            command: '/extract, /ext',
-            description: 'Extract and send files from a ZIP archive',
-            usage: '/extract',
-            examples: ['/extract', '/ext'],
-            category: 'Utilities',
-            note: '\nSend a ZIP file after using this command. You can choose to send all files or select specific ones.'
+            command: '/watchlist',
+            description: 'View and manage your movie watchlist',
+            usage: '/watchlist',
+            examples: ['/watchlist'],
+            category: 'Entertainment',
+            note: '\nShows your saved movies with options to remove them from the watchlist. Movies can be added to watchlist while browsing recommendations.'
         },
         {
             command: '/subscribe, /sub',
