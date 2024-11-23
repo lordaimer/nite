@@ -1,3 +1,5 @@
+// Checkpoint Hover Glow Effect Design 
+
 // Initialize Telegram WebApp
 const tg = window.Telegram.WebApp;
 tg.expand();
