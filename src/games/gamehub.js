@@ -24,10 +24,10 @@ document.body.classList.add(`tg-theme-${tg.colorScheme}`);
 const cards = document.querySelectorAll('.game-card');
 const light = document.querySelector('.light');
 let isTouch = false;
-let isPressed = false;
+let isButtonPressed = false;  // Track if any button was pressed
 
 function updateEffects(x, y) {
-    if (isPressed) return; // Skip hover effects if button is being pressed
+    if (isButtonPressed) return; // Skip hover effects if button is being pressed
     
     light.style.opacity = '1';
     light.style.left = `${x}px`;
@@ -69,11 +69,11 @@ function updateEffects(x, y) {
 function resetEffects() {
     light.style.opacity = '0';
     
+    // If a button was pressed, skip all animations
+    if (isButtonPressed) return;
+    
     cards.forEach(card => {
         const glowContainer = card.querySelector('.glow-container');
-        // Skip animation for action cards (buttons)
-        if (card.classList.contains('action-card')) return;
-        
         let progress = 0;
         const animate = () => {
             progress = Math.min(1, progress + 0.05);
@@ -108,6 +108,7 @@ document.addEventListener('mousemove', (e) => {
 
 document.addEventListener('mouseleave', () => {
     if (!isTouch) resetEffects();
+    isButtonPressed = false;
 });
 
 document.addEventListener('touchstart', (e) => {
@@ -121,34 +122,37 @@ document.addEventListener('touchmove', (e) => {
     updateEffects(touch.clientX, touch.clientY);
 }, { passive: true });
 
-document.addEventListener('touchend', resetEffects);
+document.addEventListener('touchend', () => {
+    resetEffects();
+    setTimeout(() => {
+        isButtonPressed = false;
+    }, 100);
+});
 
 // Add mousedown and mouseup listeners
 cards.forEach(card => {
     card.addEventListener('mousedown', () => {
-        isPressed = true;
+        isButtonPressed = true;
     });
     
     card.addEventListener('touchstart', () => {
-        isPressed = true;
+        isButtonPressed = true;
     });
 });
 
 // Global mouseup and touchend listeners
 document.addEventListener('mouseup', () => {
-    isPressed = false;
-});
-
-document.addEventListener('touchend', () => {
-    isPressed = false;
+    isButtonPressed = false;
 });
 
 // Game navigation
 document.getElementById('play-ai').addEventListener('click', () => {
+    isButtonPressed = true;
     window.location.href = 'tictactoe/tictactoe.html?mode=ai';
 });
 
 document.getElementById('play-friend').addEventListener('click', () => {
+    isButtonPressed = true;
     window.location.href = 'tictactoe/tictactoe.html?mode=friend';
 });
 
