@@ -15,7 +15,7 @@ const playerName = tg.initDataUnsafe?.user?.first_name || 'Player';
 // Game elements
 const board = document.querySelector('.game-board');
 const cells = document.querySelectorAll('.board-cell');
-const turnIndicator = document.querySelector('.turn-indicator');
+const turnIndicator = document.getElementById('turn-indicator');
 const light = document.querySelector('#light-effect .light');
 let isTouch = false;
 const restartButton = document.querySelector('.restart-button');
@@ -24,7 +24,15 @@ const restartButton = document.querySelector('.restart-button');
 let currentPlayer = 'x';
 let gameBoard = Array(9).fill('');
 let gameActive = true;
-let isAIMode = new URLSearchParams(window.location.search).get('mode') === 'ai';
+const urlParams = new URLSearchParams(window.location.search);
+const gameMode = urlParams.get('mode');
+const isAIMode = gameMode === 'ai';
+const isOnlineMode = gameMode === 'online';
+let multiplayerGame;
+
+if (isOnlineMode) {
+    multiplayerGame = new MultiplayerGame();
+}
 
 // Winning combinations
 const winPatterns = [
@@ -38,14 +46,18 @@ function resetGame() {
     gameActive = true;
     currentPlayer = 'x';
     cells.forEach(cell => {
-        cell.className = 'board-cell';
+        cell.className = 'board-cell cell';
     });
     document.querySelector('.win-line').style.opacity = '0';
     restartButton.style.display = 'none';
-    updateTurnIndicator();
+    if (!isOnlineMode) {
+        updateTurnIndicator();
+    }
 }
 
 function updateTurnIndicator() {
+    if (isOnlineMode) return; // Handled by multiplayer.js
+    
     if (!gameActive) return;
     const playerText = currentPlayer === 'x' ? `${playerName}'s` : (isAIMode ? 'Nite\'s' : 'Player O\'s');
     turnIndicator.textContent = `${playerText} turn`;
@@ -69,25 +81,25 @@ function showWinLine(pattern) {
 
     // Horizontal win
     if (a === c - 2) {
-        winLine.style.width = '92%'; // Slightly shorter than 95%
+        winLine.style.width = '92%';
         winLine.style.height = '8px';
         const row = Math.floor(a / 3);
         winLine.style.top = `calc(${row * 33.33}% + 16.665%)`;
-        winLine.style.left = '4%'; // Adjust for the shorter width
+        winLine.style.left = '4%';
         winLine.style.transform = 'none';
     }
     // Vertical win
     else if (a === c - 6) {
         winLine.style.width = '8px';
-        winLine.style.height = '92%'; // Slightly shorter than 95%
+        winLine.style.height = '92%';
         const col = a % 3;
         winLine.style.left = `calc(${col * 33.33}% + 16.665%)`;
-        winLine.style.top = '4%'; // Adjust for the shorter height
+        winLine.style.top = '4%';
         winLine.style.transform = 'none';
     }
     // Diagonal win
     else {
-        const width = '128%'; // Reduced from 133%
+        const width = '128%';
         winLine.style.width = width;
         winLine.style.height = '8px';
         winLine.style.top = '50%';
@@ -104,45 +116,63 @@ function showWinLine(pattern) {
 function handleCellClick(index) {
     if (!gameActive || gameBoard[index]) return;
 
+    if (isOnlineMode) {
+        const role = urlParams.get('role');
+        if (
+            (role === 'host' && multiplayerGame.gameState.currentTurn !== 'host') ||
+            (role === 'guest' && multiplayerGame.gameState.currentTurn !== 'guest')
+        ) {
+            return; // Not this player's turn
+        }
+        multiplayerGame.makeMove(index, role);
+        return;
+    }
+
     gameBoard[index] = currentPlayer;
-    cells[index].classList.add(currentPlayer);
-    
+    cells[index].className = `board-cell cell ${currentPlayer}`;
+    cells[index].textContent = currentPlayer.toUpperCase();
+
     const result = checkWinner();
     if (result) {
         gameActive = false;
         showWinLine(result.pattern);
-        turnIndicator.textContent = currentPlayer === 'x' ? `${playerName} wins!` : (isAIMode ? 'Nite wins!' : 'Player O wins!');
+        turnIndicator.textContent = currentPlayer === 'x' ? 
+            `${playerName} wins!` : 
+            (isAIMode ? 'Nite wins!' : 'Player O wins!');
         restartButton.style.display = 'block';
-    } else if (!gameBoard.includes('')) {
+        return;
+    }
+
+    if (!gameBoard.includes('')) {
         gameActive = false;
         turnIndicator.textContent = "It's a draw!";
-        // Auto restart after 1.5 seconds on draw
-        setTimeout(resetGame, 1500);
-    } else {
-        currentPlayer = currentPlayer === 'x' ? 'o' : 'x';
-        updateTurnIndicator();
-        
-        if (isAIMode && gameActive && currentPlayer === 'o') {
-            setTimeout(makeAIMove, 500);
-        }
+        restartButton.style.display = 'block';
+        return;
+    }
+
+    currentPlayer = currentPlayer === 'x' ? 'o' : 'x';
+    updateTurnIndicator();
+
+    if (isAIMode && currentPlayer === 'o' && gameActive) {
+        setTimeout(makeAIMove, 500);
     }
 }
 
 function makeAIMove() {
-    const bestMove = findBestMove();
-    if (bestMove !== -1) {
-        handleCellClick(bestMove);
+    const move = findBestMove();
+    if (move !== null) {
+        handleCellClick(move);
     }
 }
 
 function findBestMove() {
-    // First try to win
-    const winMove = findWinningMove('o');
-    if (winMove !== -1) return winMove;
+    // First, try to win
+    const winningMove = findWinningMove('o');
+    if (winningMove !== null) return winningMove;
 
-    // Then block opponent from winning
-    const blockMove = findWinningMove('x');
-    if (blockMove !== -1) return blockMove;
+    // Then, block player's winning move
+    const blockingMove = findWinningMove('x');
+    if (blockingMove !== null) return blockingMove;
 
     // Try to take center
     if (gameBoard[4] === '') return 4;
@@ -161,35 +191,35 @@ function findBestMove() {
         return emptyEdges[Math.floor(Math.random() * emptyEdges.length)];
     }
 
-    return -1;
+    return null;
 }
 
 function findWinningMove(player) {
     for (let i = 0; i < 9; i++) {
         if (gameBoard[i] === '') {
             gameBoard[i] = player;
-            if (checkWinner()) {
-                gameBoard[i] = '';
+            const result = checkWinner();
+            gameBoard[i] = '';
+            if (result && result.winner === player) {
                 return i;
             }
-            gameBoard[i] = '';
         }
     }
-    return -1;
+    return null;
 }
 
 // Light effect handling
 function updateEffects(x, y) {
-    if (light) {
-        light.style.left = x + 'px';
-        light.style.top = y + 'px';
-        light.style.opacity = '1';
-    }
+    const rect = board.getBoundingClientRect();
+    const boardX = rect.left + rect.width / 2;
+    const boardY = rect.top + rect.height / 2;
+    const angle = Math.atan2(y - boardY, x - boardX) * 180 / Math.PI;
+    light.style.transform = `rotate(${angle}deg)`;
 }
 
 function resetEffects() {
-    if (light) {
-        light.style.opacity = '0';
+    if (!isTouch) {
+        light.style.transform = 'rotate(0deg)';
     }
 }
 
@@ -200,24 +230,17 @@ document.addEventListener('mousemove', (e) => {
 
 document.addEventListener('touchstart', () => {
     isTouch = true;
-    resetEffects();
+    light.style.animation = 'rotate 4s linear infinite';
 });
 
-document.addEventListener('touchend', resetEffects);
-
-// Handle visibility and resize
-document.addEventListener('visibilitychange', () => {
-    if (document.hidden) resetEffects();
-});
-
-// Initialize game
+// Event listeners for game
 cells.forEach((cell, index) => {
     cell.addEventListener('click', () => handleCellClick(index));
-    cell.addEventListener('touchstart', () => {
-        isTouch = true;
-    }, { passive: true });
 });
 
 restartButton.addEventListener('click', resetGame);
 
-updateTurnIndicator();
+// Initialize turn indicator
+if (!isOnlineMode) {
+    updateTurnIndicator();
+}

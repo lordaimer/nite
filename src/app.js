@@ -8,6 +8,7 @@ import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { setupTunnel } from './tunnel.js';
+import { initGameServer } from './server.js';
 
 // Get the directory name of the current module
 const __filename = fileURLToPath(import.meta.url);
@@ -23,6 +24,8 @@ app.use('/games', express.static(join(__dirname, 'games')));
 // Start the server and setup tunnel
 app.listen(PORT, '0.0.0.0', async () => {
     await setupTunnel();
+    // Initialize game server after tunnel is set up
+    initGameServer();
 });
 
 import {
