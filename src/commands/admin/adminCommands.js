@@ -63,9 +63,10 @@ _Use these commands responsibly!_`;
     // Access mode command
     bot.onText(/^\/access(?:\s+(public|private))?$/, async (msg, match) => {
         const userId = msg.from.id;
+        const chatId = msg.chat.id;
 
         if (!isAdmin(userId)) {
-            await bot.sendMessage(msg.chat.id, '⛔ Sorry, this command is only available to administrators.');
+            await bot.sendMessage(chatId, '⛔ Sorry, this command is only available to administrators.');
             return;
         }
 
@@ -75,18 +76,26 @@ _Use these commands responsibly!_`;
             // If no mode specified, show current status
             if (!requestedMode) {
                 const currentMode = stateService.isPublicMode() ? '🌐 Public' : '🔒 Private';
-                await bot.sendMessage(msg.chat.id, `Current access mode: ${currentMode}\n\nUse /access [public|private] to change the mode.`);
+                await bot.sendMessage(chatId, `Current access mode: ${currentMode}\n\nUse /access [public|private] to change the mode.`);
+                return;
+            }
+
+            // Check if we're already in the requested mode
+            const isCurrentlyPublic = stateService.isPublicMode();
+            if ((requestedMode === 'public' && isCurrentlyPublic) || 
+                (requestedMode === 'private' && !isCurrentlyPublic)) {
+                await bot.sendMessage(chatId, `ℹ️ Bot is already in ${requestedMode} mode.`);
                 return;
             }
 
             // Change mode if specified
             await stateService.setAccessMode(requestedMode);
             const modeEmoji = requestedMode === 'public' ? '🌐' : '🔒';
-            await bot.sendMessage(msg.chat.id, `${modeEmoji} Bot access mode changed to ${requestedMode}.`);
+            await bot.sendMessage(chatId, `${modeEmoji} Bot access mode changed to ${requestedMode}.`);
             
         } catch (error) {
             console.error('Error handling access command:', error.message);
-            await bot.sendMessage(msg.chat.id, '⚠️ Error changing access mode. Please try again.');
+            await bot.sendMessage(chatId, '⚠️ Error changing access mode. Please try again.');
         }
     });
 

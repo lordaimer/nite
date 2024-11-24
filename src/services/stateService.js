@@ -27,41 +27,59 @@ class StateService {
 
     async loadState() {
         try {
-            try {
-                await fs.access(STATE_FILE);
-            } catch {
+            // Check if state file exists
+            const exists = await fs.access(STATE_FILE)
+                .then(() => true)
+                .catch(() => false);
+
+            if (!exists) {
+                // Create default state if file doesn't exist
                 await this.saveState();
                 return;
             }
 
+            // Read and parse state file
             const data = await fs.readFile(STATE_FILE, 'utf8');
-            const parsedState = JSON.parse(data);
-            
-            if (typeof parsedState === 'object' && 'accessMode' in parsedState) {
-                this.state = parsedState;
+            const state = JSON.parse(data);
+
+            if (typeof state.accessMode === 'string') {
+                this.state = state;
             } else {
-                console.error('Invalid state structure, using default');
+                // Reset to default if invalid
+                this.state = { accessMode: 'private' };
                 await this.saveState();
             }
         } catch (error) {
-            console.error('Error loading state:', error);
+            console.error('Error loading state:', error.message);
+            this.state = { accessMode: 'private' };
             await this.saveState();
         }
     }
 
     async saveState() {
         try {
-            const stateJson = JSON.stringify(this.state, null, 2);
-            await fs.writeFile(STATE_FILE, stateJson, 'utf8');
+            // Ensure state has the correct structure
+            const validState = {
+                accessMode: this.state.accessMode === 'public' ? 'public' : 'private'
+            };
             
-            // Verify the file was written correctly
-            const verifyData = await fs.readFile(STATE_FILE, 'utf8');
-            const verifyState = JSON.parse(verifyData);
-            if (verifyState.accessMode !== this.state.accessMode) {
+            const stateJson = JSON.stringify(validState, null, 2);
+            
+            // Write to file
+            await fs.writeFile(STATE_FILE, stateJson, { encoding: 'utf8', flag: 'w' });
+            
+            // Verify the written content
+            const written = await fs.readFile(STATE_FILE, 'utf8');
+            const parsed = JSON.parse(written);
+            
+            if (parsed.accessMode !== validState.accessMode) {
                 throw new Error('State verification failed');
             }
         } catch (error) {
-            console.error('Error saving state:', error);
+            console.error('Error saving state:', error.message);
+            // Write a clean state as fallback
+            const fallbackState = JSON.stringify({ accessMode: 'private' }, null, 2);
+            await fs.writeFile(STATE_FILE, fallbackState, { encoding: 'utf8', flag: 'w' });
             throw error;
         }
     }

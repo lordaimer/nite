@@ -129,6 +129,10 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
+# Cloudflared binary
+cloudflared.exe
+cloudflared
+
 # Project specific
 nite-init.vbs
 nodemon.json
@@ -139,4 +143,4 @@ temp
 src/data/botState.json
 src/data/bugs.json
 src/data/*.db 
-dbquery.js 
+dbquery.js

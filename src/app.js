@@ -4,14 +4,38 @@ dotenv.config();
 
 import TelegramBot from 'node-telegram-bot-api';
 import URLParse from 'url-parse';
+import express from 'express';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { setupTunnel } from './tunnel.js';
 
-// Import commands
+// Get the directory name of the current module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Create Express app
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Serve static files from the games directory
+app.use('/games', (req, res, next) => {
+    // Set header to skip ngrok browser warning
+    res.setHeader('ngrok-skip-browser-warning', '1');
+    next();
+}, express.static(join(__dirname, 'games')));
+
+// Start the server and setup tunnel
+app.listen(PORT, '0.0.0.0', async () => {
+    await setupTunnel();
+});
+
 import {
     setupAdminCommands,
     setupMemeCommand,
     setupImageCommand,
     setupMovieCommand,
     setupGameCommand,
+    setupGameAppCommand,
     setupDownloadCommand,
     setupTranscribeCommand,
     setupTimeCommand,
@@ -55,21 +79,17 @@ function setupBotConnection() {
     const maxReconnectAttempts = 10;
 
     bot.on('polling_error', (error) => {
-        console.error('Polling error:', error);
         if (reconnectAttempts < maxReconnectAttempts) {
             reconnectAttempts++;
             setTimeout(() => {
-                console.log(`Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`);
                 bot.stopPolling().then(() => bot.startPolling());
             }, 5000 * Math.pow(2, reconnectAttempts));
         } else {
-            console.error('Max reconnection attempts reached');
             process.exit(1); // Let process manager restart the bot
         }
     });
 
     bot.on('webhook_error', (error) => {
-        console.error('Webhook error:', error);
     });
 }
 
@@ -88,6 +108,7 @@ async function setupCommandsWithRateLimits() {
     setupImageCommand(bot, rateLimitService);
     setupMovieCommand(bot, rateLimitService);
     setupGameCommand(bot, rateLimitService);
+    setupGameAppCommand(bot, rateLimitService);
     setupDownloadCommand(bot, rateLimitService);
     setupTranscribeCommand(bot, rateLimitService, voiceService);
     setupWhatToWatchCommand(bot, rateLimitService);
@@ -218,7 +239,6 @@ bot.on('message', async (msg) => {
                 
                 await bot.deleteMessage(chatId, statusMessage.message_id);
             } catch (error) {
-                console.error('Error in meme command:', error);
                 await bot.editMessageText('😅 Oops! The meme escaped. Let\'s try again!', {
                     chat_id: chatId,
                     message_id: statusMessage.message_id
@@ -232,7 +252,6 @@ bot.on('message', async (msg) => {
         const response = await llmService.generateResponse(messageText, chatId);
         await llmService.sendResponse(bot, chatId, response);
     } catch (error) {
-        console.error('Error processing message:', error);
     }
 });
 
@@ -271,11 +290,11 @@ bot.on('callback_query', async (query) => {
 });
 
 process.on('uncaughtException', (error) => {
-    console.error('Error:', error.message);
+    process.exit(1);
 });
 
 process.on('unhandledRejection', (error) => {
-    console.error('Error:', error.message);
+    process.exit(1);
 });
 
 // Add to bot.js
@@ -316,8 +335,6 @@ setupScheduler(bot);
 
 function setupGracefulShutdown(bot) {
     const shutdown = async (signal) => {
-        console.log(`Received ${signal}. Cleaning up...`);
-        
         // Cleanup all active sessions
         cleanupResources();
         
@@ -327,7 +344,6 @@ function setupGracefulShutdown(bot) {
         // Stop bot polling
         await bot.stopPolling();
         
-        console.log('Cleanup complete. Shutting down...');
         process.exit(0);
     };
 

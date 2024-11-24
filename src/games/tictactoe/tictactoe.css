@@ -1,0 +1,258 @@
+/* Checkpoint: Hover Glow Effect Design */
+
+:root {
+    --bg-color: #000000;
+    --text-color: #FFFFFF;
+    --x-color: #FF4B6E;
+    --o-color: #4B9EFF;
+    --cell-size: 110px;
+    --board-gap: 12px;
+    --board-size: 360px;
+    --card-bg: rgba(255, 255, 255, 0.01);
+    --border-color: rgba(255, 255, 255, 0.05);
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.game-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+.game-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.top-spacer {
+    height: 40px;
+    flex-shrink: 0;
+}
+
+.turn-indicator {
+    padding: 12px 24px;
+    border-radius: 12px;
+    background: var(--card-bg);
+    color: var(--text-color);
+    font-size: 24px;
+    text-align: center;
+    border: 1px solid var(--border-color);
+    width: calc(var(--board-size) + 30px);
+    box-sizing: border-box;
+}
+
+.turn-indicator.x {
+    color: var(--x-color);
+}
+
+.turn-indicator.o {
+    color: var(--o-color);
+}
+
+.game-board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--board-gap);
+    width: var(--board-size);
+    height: var(--board-size);
+    position: relative;
+    overflow: hidden;
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid var(--border-color);
+    padding: 15px;
+}
+
+.board-cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    position: relative;
+    border: 1px solid var(--border-color);
+}
+
+.board-cell:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.board-cell.x,
+.board-cell.o {
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 70%;
+}
+
+.board-cell.x {
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20L80 80M80 20L20 80' stroke='%23FF4B6E' stroke-width='12' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+.board-cell.o {
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='50' cy='50' r='35' stroke='%234B9EFF' stroke-width='12'/%3E%3C/svg%3E");
+}
+
+.button-container {
+    height: 48px; /* Height of the button */
+    width: calc(var(--board-size) + 30px);
+}
+
+.restart-button {
+    padding: 12px 24px;
+    border-radius: 12px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    font-size: 24px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, opacity 0.3s ease;
+    opacity: 0;
+    pointer-events: none;
+    width: 100%;
+    box-sizing: border-box;
+    display: none;
+}
+
+.restart-button[style*="display: block"] {
+    opacity: 1;
+    pointer-events: auto;
+    display: block;
+}
+
+.win-line {
+    position: absolute;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    height: 8px;
+    border-radius: 4px;
+    transform-origin: center;
+    z-index: 2;
+}
+
+.win-line.x {
+    background: var(--x-color);
+}
+
+.win-line.o {
+    background: var(--o-color);
+}
+
+.win-line.horizontal {
+    width: calc(100% - var(--board-gap) * 2);
+    left: var(--board-gap);
+    border-radius: 4px;
+}
+
+.win-line.vertical {
+    width: 8px;
+    height: calc(100% - var(--board-gap) * 2);
+    top: var(--board-gap);
+    border-radius: 4px;
+}
+
+.win-line.diagonal {
+    width: calc(100% * 1.4142);
+    height: 8px;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 4px;
+}
+
+.light {
+    position: fixed;
+    width: 800px;
+    height: 800px;
+    pointer-events: none;
+    background: radial-gradient(
+        circle at center,
+        rgba(255, 255, 255, 0.1) 0%,
+        rgba(255, 255, 255, 0) 50%
+    );
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 0;
+}
+
+/* Global light source */
+#global-light {
+    position: fixed;
+    bottom: -20vh;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background: radial-gradient(circle at 50% 100%, 
+        rgba(255, 255, 255, 0.06) 0%,
+        rgba(255, 255, 255, 0.045) 35%,
+        rgba(255, 255, 255, 0.03) 65%,
+        transparent 90%
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Light effect */
+#light-effect {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+
+#light-effect .light {
+    position: absolute;
+    width: 800px;
+    height: 800px;
+    background: radial-gradient(circle, 
+        rgba(255, 255, 255, 0.03) 0%,
+        rgba(255, 255, 255, 0.02) 20%,
+        transparent 65%
+    );
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+@media (max-width: 480px) {
+    :root {
+        --cell-size: 100px;
+        --board-gap: 10px;
+        --board-size: 320px;
+    }
+    
+    .game-content {
+        margin-top: -80px;
+    }
+    
+    .turn-indicator {
+        font-size: 28px;
+        padding: 12px 24px;
+    }
+    
+    .board-cell {
+        font-size: 56px;
+    }
+}
