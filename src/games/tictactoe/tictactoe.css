@@ -1,26 +1,32 @@
-/* Checkpoint: Hover Glow Effect Design */
+/* Modern Mobile Game Style */
 
 :root {
-    --bg-color: #000000;
-    --text-color: #FFFFFF;
-    --x-color: #FF4B6E;
-    --o-color: #4B9EFF;
+    --x-color: #FF3B3B;
+    --o-color: #2B7FFF;
+    --x-bg: #FFE5E5;
+    --o-bg: #E5F0FF;
+    --grid-color: #333333;
+    --win-color: #FFFFFF;
     --cell-size: 110px;
-    --board-gap: 12px;
+    --board-gap: 4px;
     --board-size: 360px;
-    --card-bg: rgba(255, 255, 255, 0.01);
-    --border-color: rgba(255, 255, 255, 0.05);
+    --grid-width: 6px;
 }
 
 body {
     margin: 0;
     padding: 0;
-    background: var(--bg-color);
-    color: var(--text-color);
+    background: var(--x-bg);
+    color: var(--grid-color);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     min-height: 100vh;
     height: 100vh;
     overflow: hidden;
+    transition: background-color 0.5s ease;
+}
+
+body.o-turn {
+    background: var(--o-bg);
 }
 
 .game-wrapper {
@@ -34,24 +40,19 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
-}
-
-.top-spacer {
-    height: 40px;
-    flex-shrink: 0;
+    gap: 20px;
 }
 
 .turn-indicator {
     padding: 12px 24px;
     border-radius: 12px;
-    background: var(--card-bg);
-    color: var(--text-color);
-    font-size: 24px;
+    background: rgba(255, 255, 255, 0.9);
+    font-size: 28px;
+    font-weight: bold;
     text-align: center;
-    border: 1px solid var(--border-color);
     width: calc(var(--board-size) + 30px);
     box-sizing: border-box;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .turn-indicator.x {
@@ -63,35 +64,48 @@ body {
 }
 
 .game-board {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--board-gap);
+    position: relative;
     width: var(--board-size);
     height: var(--board-size);
-    position: relative;
-    overflow: hidden;
-    border-radius: 24px;
-    background: rgba(255, 255, 255, 0.01);
-    border: 1px solid var(--border-color);
-    padding: 15px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    background: transparent;
+}
+
+/* Traditional Tic-tac-toe grid lines */
+.game-board::before,
+.game-board::after {
+    content: '';
+    position: absolute;
+    background-color: var(--grid-color);
+    border-radius: calc(var(--grid-width) / 2);
+}
+
+/* Vertical lines */
+.game-board::before {
+    width: var(--grid-width);
+    height: 100%;
+    left: calc(33.33% - var(--grid-width) / 2);
+    box-shadow: calc(var(--board-size) / 3) 0 0 var(--grid-color);
+}
+
+/* Horizontal lines */
+.game-board::after {
+    width: 100%;
+    height: var(--grid-width);
+    top: calc(33.33% - var(--grid-width) / 2);
+    box-shadow: 0 calc(var(--board-size) / 3) 0 var(--grid-color);
 }
 
 .board-cell {
     width: var(--cell-size);
     height: var(--cell-size);
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: background-color 0.3s ease;
     position: relative;
-    border: 1px solid var(--border-color);
-}
-
-.board-cell:hover {
-    background: rgba(255, 255, 255, 0.05);
+    z-index: 1;
 }
 
 .board-cell.x,
@@ -102,157 +116,78 @@ body {
 }
 
 .board-cell.x {
-    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20L80 80M80 20L20 80' stroke='%23FF4B6E' stroke-width='12' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20L80 80M80 20L20 80' stroke='%23FF3B3B' stroke-width='12' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 
 .board-cell.o {
-    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='50' cy='50' r='35' stroke='%234B9EFF' stroke-width='12'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='50' cy='50' r='35' stroke='%232B7FFF' stroke-width='12' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 
-.button-container {
-    height: 48px; /* Height of the button */
-    width: calc(var(--board-size) + 30px);
+.board-cell.x::before,
+.board-cell.x::after,
+.board-cell.o::before {
+    display: none;
+}
+
+.board-cell.x,
+.board-cell.o {
+    animation: pieceIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes pieceIn {
+    from {
+        transform: scale(0);
+    }
+    to {
+        transform: scale(1);
+    }
+}
+
+.winning-line {
+    position: absolute;
+    background: var(--grid-color);
+    border-radius: calc(var(--grid-width) / 2);
+    z-index: 2;
+    transform-origin: left center;
+    animation: lineIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes lineIn {
+    from {
+        transform: scaleX(0);
+    }
+    to {
+        transform: scaleX(1);
+    }
 }
 
 .restart-button {
     padding: 12px 24px;
     border-radius: 12px;
-    background: var(--card-bg);
-    border: 1px solid var(--border-color);
-    color: var(--text-color);
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    color: var(--grid-color);
     font-size: 24px;
+    font-weight: bold;
     cursor: pointer;
-    transition: background-color 0.3s ease, opacity 0.3s ease;
-    opacity: 0;
-    pointer-events: none;
-    width: 100%;
-    box-sizing: border-box;
-    display: none;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.restart-button[style*="display: block"] {
-    opacity: 1;
-    pointer-events: auto;
-    display: block;
-}
-
-.win-line {
-    position: absolute;
-    background: currentColor;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    height: 8px;
-    border-radius: 4px;
-    transform-origin: center;
-    z-index: 2;
-}
-
-.win-line.x {
-    background: var(--x-color);
-}
-
-.win-line.o {
-    background: var(--o-color);
-}
-
-.win-line.horizontal {
-    width: calc(100% - var(--board-gap) * 2);
-    left: var(--board-gap);
-    border-radius: 4px;
-}
-
-.win-line.vertical {
-    width: 8px;
-    height: calc(100% - var(--board-gap) * 2);
-    top: var(--board-gap);
-    border-radius: 4px;
-}
-
-.win-line.diagonal {
-    width: calc(100% * 1.4142);
-    height: 8px;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    border-radius: 4px;
-}
-
-.light {
-    position: fixed;
-    width: 800px;
-    height: 800px;
-    pointer-events: none;
-    background: radial-gradient(
-        circle at center,
-        rgba(255, 255, 255, 0.1) 0%,
-        rgba(255, 255, 255, 0) 50%
-    );
-    transform: translate(-50%, -50%);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    z-index: 0;
-}
-
-/* Global light source */
-#global-light {
-    position: fixed;
-    bottom: -20vh;
-    left: 0;
-    width: 100%;
-    height: 100vh;
-    background: radial-gradient(circle at 50% 100%, 
-        rgba(255, 255, 255, 0.06) 0%,
-        rgba(255, 255, 255, 0.045) 35%,
-        rgba(255, 255, 255, 0.03) 65%,
-        transparent 90%
-    );
-    pointer-events: none;
-    z-index: 0;
-}
-
-/* Light effect */
-#light-effect {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 1;
-}
-
-#light-effect .light {
-    position: absolute;
-    width: 800px;
-    height: 800px;
-    background: radial-gradient(circle, 
-        rgba(255, 255, 255, 0.03) 0%,
-        rgba(255, 255, 255, 0.02) 20%,
-        transparent 65%
-    );
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    opacity: 0;
-    transition: opacity 0.15s ease;
+.restart-button:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 1);
 }
 
 @media (max-width: 480px) {
     :root {
         --cell-size: 100px;
-        --board-gap: 10px;
         --board-size: 320px;
-    }
-    
-    .game-content {
-        margin-top: -80px;
+        --grid-width: 5px;
     }
     
     .turn-indicator {
-        font-size: 28px;
-        padding: 12px 24px;
-    }
-    
-    .board-cell {
-        font-size: 56px;
+        font-size: 24px;
+        padding: 10px 20px;
     }
 }

@@ -148,7 +148,7 @@ document.addEventListener('mouseup', () => {
 // Game navigation
 document.getElementById('play-ai').addEventListener('click', () => {
     isButtonPressed = true;
-    window.location.href = 'tictactoe/tictactoe.html?mode=ai';
+    window.location.href = '/games/tictactoe/tictactoe.html?mode=ai';
 });
 
 document.getElementById('play-friend').addEventListener('click', () => {
@@ -201,7 +201,7 @@ tg.BackButton.onClick(() => window.history.back());
 const games = {
     tictactoe: {
         name: 'Tic Tac Toe',
-        path: '/tictactoe/',
+        path: '/games/tictactoe/',
         description: 'Classic two-player game'
     }
     // Add more games here

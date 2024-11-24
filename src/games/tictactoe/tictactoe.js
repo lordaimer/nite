@@ -46,8 +46,14 @@ function resetGame() {
     gameActive = true;
     currentPlayer = 'x';
     cells.forEach(cell => {
-        cell.className = 'board-cell cell';
+        cell.className = 'board-cell';
     });
+    // Reset background to X's turn
+    document.body.classList.remove('o-turn');
+    updateTurnIndicator();
+    if (document.querySelector('.winning-line')) {
+        document.querySelector('.winning-line').remove();
+    }
     document.querySelector('.win-line').style.opacity = '0';
     restartButton.style.display = 'none';
     if (!isOnlineMode) {
@@ -59,9 +65,10 @@ function updateTurnIndicator() {
     if (isOnlineMode) return; // Handled by multiplayer.js
     
     if (!gameActive) return;
-    const playerText = currentPlayer === 'x' ? `${playerName}'s` : (isAIMode ? 'Nite\'s' : 'Player O\'s');
-    turnIndicator.textContent = `${playerText} turn`;
+    turnIndicator.textContent = `${currentPlayer.toUpperCase()}'s Turn`;
     turnIndicator.className = `turn-indicator ${currentPlayer}`;
+    // Update background color based on current player
+    document.body.classList.toggle('o-turn', currentPlayer === 'o');
 }
 
 function checkWinner() {
@@ -114,23 +121,17 @@ function showWinLine(pattern) {
 }
 
 function handleCellClick(index) {
-    if (!gameActive || gameBoard[index]) return;
+    if (!gameActive || gameBoard[index] !== '') return;
 
     if (isOnlineMode) {
-        const role = urlParams.get('role');
-        if (
-            (role === 'host' && multiplayerGame.gameState.currentTurn !== 'host') ||
-            (role === 'guest' && multiplayerGame.gameState.currentTurn !== 'guest')
-        ) {
-            return; // Not this player's turn
-        }
+        const role = multiplayerGame.getRole();
+        if (!role || currentPlayer !== role) return;
         multiplayerGame.makeMove(index, role);
         return;
     }
 
     gameBoard[index] = currentPlayer;
-    cells[index].className = `board-cell cell ${currentPlayer}`;
-    cells[index].textContent = currentPlayer.toUpperCase();
+    cells[index].className = `board-cell ${currentPlayer}`;
 
     const result = checkWinner();
     if (result) {
