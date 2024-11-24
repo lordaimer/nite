@@ -10,23 +10,31 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-async function setupTunnel() {
+let tunnelProcess = null;
+const RETRY_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+async function attemptTunnelSetup() {
     return new Promise((resolve) => {
         try {
             const cloudflaredPath = join(process.cwd(), 'cloudflared.exe');
             const port = process.env.PORT || 3000;
 
+            // Cleanup any existing tunnel process
+            if (tunnelProcess) {
+                tunnelProcess.kill();
+            }
+
             // Start cloudflared tunnel as a child process
-            const tunnel = spawn(cloudflaredPath, ['tunnel', '--url', `http://localhost:${port}`]);
+            tunnelProcess = spawn(cloudflaredPath, ['tunnel', '--url', `http://localhost:${port}`]);
 
             // Handle tunnel output
-            tunnel.stdout.on('data', (data) => {
+            tunnelProcess.stdout.on('data', (data) => {
                 const output = data.toString();
                 console.log('Cloudflare tunnel output:', output);
             });
 
             let tunnelUrl = null;
-            tunnel.stderr.on('data', (data) => {
+            tunnelProcess.stderr.on('data', (data) => {
                 const output = data.toString();
                 
                 // Look for the tunnel URL in the stderr output
@@ -42,16 +50,20 @@ async function setupTunnel() {
                     }
                 }
                 
+                // Check for rate limit error
+                if (output.includes('429 Too Many Requests')) {
+                    console.log('Cloudflare rate limit hit. Will retry in 5 minutes.');
+                }
+                
                 // Log other messages for debugging
                 if (!output.includes('INF')) {  // Only log non-INFO messages
                     console.error('Cloudflare tunnel error:', output);
                 }
             });
 
-            tunnel.on('close', (code) => {
+            tunnelProcess.on('close', (code) => {
                 if (code !== 0) {
                     console.error(`Cloudflare tunnel process exited with code ${code}`);
-                    // Don't reject, just resolve with null to indicate tunnel failed
                     resolve(null);
                 }
             });
@@ -59,7 +71,7 @@ async function setupTunnel() {
             // Set a timeout for tunnel creation
             setTimeout(() => {
                 if (!tunnelUrl) {
-                    console.log('Tunnel setup timed out or failed. Bot will continue without tunnel.');
+                    console.log('Tunnel setup timed out or failed. Will retry in 5 minutes.');
                     resolve(null);
                 } else {
                     resolve(tunnelUrl);
@@ -71,6 +83,37 @@ async function setupTunnel() {
             resolve(null);
         }
     });
+}
+
+async function setupTunnel() {
+    let tunnelUrl = await attemptTunnelSetup();
+    
+    // If tunnel setup fails, start retry mechanism
+    if (!tunnelUrl) {
+        console.log('Starting tunnel retry mechanism...');
+        
+        // Set up retry interval
+        const retryInterval = setInterval(async () => {
+            console.log('Attempting to create tunnel again...');
+            tunnelUrl = await attemptTunnelSetup();
+            
+            if (tunnelUrl) {
+                console.log('Tunnel successfully created on retry!');
+                clearInterval(retryInterval);
+            }
+        }, RETRY_INTERVAL);
+
+        // Handle process shutdown
+        process.on('SIGINT', () => {
+            if (tunnelProcess) {
+                tunnelProcess.kill();
+            }
+            clearInterval(retryInterval);
+            process.exit();
+        });
+    }
+
+    return tunnelUrl;
 }
 
 export { setupTunnel };
