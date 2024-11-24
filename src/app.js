@@ -23,8 +23,16 @@ app.use('/games', express.static(join(__dirname, 'games')));
 
 // Start the server and setup tunnel
 app.listen(PORT, '0.0.0.0', async () => {
-    await setupTunnel();
-    // Initialize game server after tunnel is set up
+    console.log(`Express server is running on port ${PORT}`);
+    
+    // Try to set up tunnel but continue even if it fails
+    const tunnelUrl = await setupTunnel();
+    if (!tunnelUrl) {
+        console.log('Tunnel setup failed or timed out. Bot will operate in local mode.');
+        process.env.BASE_URL = `http://localhost:${PORT}`;
+    }
+    
+    // Initialize game server regardless of tunnel status
     initGameServer();
 });
 
