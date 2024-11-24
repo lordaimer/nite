@@ -32,6 +32,8 @@ async function setupTunnel() {
                 const match = output.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
                 if (match) {
                     const url = match[0];
+                    // Set the BASE_URL in process.env
+                    process.env.BASE_URL = url;
                     const miniAppUrl = `${url}/games/gamehub/gamehub.html`;
                     console.log(' Mini App URL set to:', miniAppUrl);
                     updateMiniAppUrl(miniAppUrl);

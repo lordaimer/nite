@@ -153,7 +153,33 @@ document.getElementById('play-ai').addEventListener('click', () => {
 
 document.getElementById('play-friend').addEventListener('click', () => {
     isButtonPressed = true;
-    window.location.href = 'tictactoe/tictactoe.html?mode=friend';
+    // Generate a unique game ID using chat ID and random string
+    const chatId = tg.initDataUnsafe?.user?.id || Date.now(); // Use chat ID if available
+    const randomStr = Math.random().toString(36).substring(2, 8);
+    const gameId = `${chatId}-${randomStr}`;
+    
+    // Create a Telegram deep link that opens the bot chat with the game invite command
+    const botUsername = 'niitebot';
+    const deepLink = `https://t.me/${botUsername}?start=game_${gameId}`;
+    
+    // Show message with the invite link
+    tg.showPopup({
+        title: '🎮 Game Invite Created',
+        message: 'Share this message with your friend to start playing!\n\n' +
+                'Note: You can forward this message to anyone you want to play with.',
+        buttons: [
+            { id: 'copy', type: 'default', text: '📋 Copy Invite Link' }
+        ]
+    }, (buttonId) => {
+        if (buttonId === 'copy') {
+            // Copy the invite link to clipboard
+            navigator.clipboard.writeText(deepLink).then(() => {
+                tg.showAlert('✅ Game invite link copied to clipboard!');
+            }).catch(() => {
+                tg.showAlert('❌ Failed to copy link. Please try again.');
+            });
+        }
+    });
 });
 
 // Handle visibility and resize

@@ -23,10 +23,69 @@ export function setupStartCommand(bot, limit) {
     };
 
     // Create the command handler
-    const commandHandler = async (msg) => {
+    const commandHandler = async (msg, gameId = null) => {
         const chatId = msg.chat.id;
         const firstName = msg.from.first_name;
         
+        // If this is a game invite
+        if (gameId) {
+            try {
+                // Escape special characters in the URL
+                const escapedUrl = `https://t.me/niitebot?start=game_${gameId}`.replace(/_/g, '\\_');
+                
+                const gameInviteMessage = `🎮 Tic Tac Toe Game Invite\n\n${firstName} wants to play Tic Tac Toe with you!\n\n🔗 Join the game: ${escapedUrl}`;
+                
+                await bot.sendMessage(chatId, gameInviteMessage, { 
+                    parse_mode: 'Markdown',
+                    disable_web_page_preview: true
+                });
+                
+                // Send a message to the game host
+                if (msg.text?.startsWith('/start game_')) {
+                    console.log('Processing game invite join. Game ID:', gameId);
+                    // This is the joining player
+                    const [hostChatId] = gameId.split('-'); // First part of gameId is timestamp which we'll use as host's chat ID
+                    
+                    if (!hostChatId) {
+                        console.error('Invalid game ID format:', gameId);
+                        return;
+                    }
+
+                    console.log('Attempting to notify host. Host Chat ID:', hostChatId);
+                    
+                    try {
+                        await bot.sendMessage(hostChatId, `🎮 ${firstName} is waiting to play Tic Tac Toe!\n\nClick the button below to join the game:`, {
+                            parse_mode: 'Markdown',
+                            reply_markup: {
+                                inline_keyboard: [[{
+                                    text: '🎮 Join Game',
+                                    web_app: { url: `${process.env.BASE_URL}/games/tictactoe/tictactoe.html?mode=online&gameId=${gameId}&role=host` }
+                                }]]
+                            }
+                        });
+                        console.log('Successfully notified host');
+                    } catch (hostNotifyError) {
+                        console.error('Failed to notify host:', hostNotifyError);
+                        // Send a message to the joining player if we couldn't notify the host
+                        await bot.sendMessage(chatId, '⚠️ Unable to notify the game host. You can try joining the game directly:', {
+                            parse_mode: 'Markdown',
+                            reply_markup: {
+                                inline_keyboard: [[{
+                                    text: '🎮 Join Game',
+                                    web_app: { url: `${process.env.BASE_URL}/games/tictactoe/tictactoe.html?mode=online&gameId=${gameId}&role=guest` }
+                                }]]
+                            }
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error processing game invite:', error);
+                await bot.sendMessage(chatId, '❌ Sorry, there was an error processing the game invite. Please try again.');
+            }
+            return;
+        }
+        
+        // Regular start command handling
         const now = new Date();
         const hour = now.getHours();
         
@@ -53,9 +112,10 @@ export function setupStartCommand(bot, limit) {
     };
 
     // Set up the command with rate limiting
-    bot.onText(/^\/start$/, (msg) => {
+    bot.onText(/^\/start(?:(?:\s+game_([a-zA-Z0-9-]+))|$)/, (msg, match) => {
         const userId = msg.from.id;
         const now = Date.now();
+        const gameId = match ? match[1] : null;
         
         // Initialize user's rate limit data if not exists
         if (!limit.lastRequest) limit.lastRequest = {};
@@ -75,6 +135,6 @@ export function setupStartCommand(bot, limit) {
         limit.lastRequest[userId] = now;
         limit.requestCount[userId] = (limit.requestCount[userId] || 0) + 1;
         
-        commandHandler(msg);
+        commandHandler(msg, gameId);
     });
 }
