@@ -1,28 +1,31 @@
 /* Modern Mobile Game Style */
 
 :root {
+    /* Core colors */
     --x-color: #FF3B3B;
     --o-color: #2B7FFF;
     --x-bg: #FFE5E5;
     --o-bg: #E5F0FF;
-    --grid-color: #333333;
+    --grid-color: rgba(0, 0, 0, 0.15);
     --win-color: #FFFFFF;
-    --cell-size: 110px;
-    --board-gap: 4px;
+    
+    /* Board dimensions */
     --board-size: 360px;
     --grid-width: 6px;
+    --cell-size: 110px;
+    --board-gap: 4px;
 }
 
 body {
     margin: 0;
     padding: 0;
-    background: var(--x-bg);
-    color: var(--grid-color);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     min-height: 100vh;
-    height: 100vh;
-    overflow: hidden;
-    transition: background-color 0.5s ease;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: var(--x-bg);
+    transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    font-family: 'Arial', sans-serif;
 }
 
 body.o-turn {
@@ -33,7 +36,9 @@ body.o-turn {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 100vh;
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
 }
 
 .game-content {
@@ -64,101 +69,113 @@ body.o-turn {
 }
 
 .game-board {
-    position: relative;
     width: var(--board-size);
     height: var(--board-size);
+    position: relative;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
     background: transparent;
+    border-radius: 12px;
+    /* Lifted effect */
+    box-shadow: 
+        0 20px 25px -5px rgba(0, 0, 0, 0.1),
+        0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
-/* Traditional Tic-tac-toe grid lines */
+/* Grid lines with 3D effect */
 .game-board::before,
 .game-board::after {
     content: '';
     position: absolute;
-    background-color: var(--grid-color);
-    border-radius: calc(var(--grid-width) / 2);
+    background: var(--grid-color);
+    border-radius: 3px;
+    box-shadow: 
+        0 2px 4px rgba(0, 0, 0, 0.05),
+        0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-/* Vertical lines */
 .game-board::before {
     width: var(--grid-width);
     height: 100%;
     left: calc(33.33% - var(--grid-width) / 2);
-    box-shadow: calc(var(--board-size) / 3) 0 0 var(--grid-color);
+    box-shadow: 
+        var(--grid-width) 0 0 rgba(255, 255, 255, 0.05),
+        calc(var(--board-size) / 3) 0 0 var(--grid-color),
+        calc(var(--board-size) / 3 + var(--grid-width)) 0 0 rgba(255, 255, 255, 0.05);
 }
 
-/* Horizontal lines */
 .game-board::after {
     width: 100%;
     height: var(--grid-width);
     top: calc(33.33% - var(--grid-width) / 2);
-    box-shadow: 0 calc(var(--board-size) / 3) 0 var(--grid-color);
+    box-shadow: 
+        0 var(--grid-width) 0 rgba(255, 255, 255, 0.05),
+        0 calc(var(--board-size) / 3) 0 var(--grid-color),
+        0 calc(var(--board-size) / 3 + var(--grid-width)) 0 rgba(255, 255, 255, 0.05);
 }
 
 .board-cell {
-    width: var(--cell-size);
-    height: var(--cell-size);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: none;
     position: relative;
-    z-index: 1;
-}
-
-.board-cell.x,
-.board-cell.o {
-    background-repeat: no-repeat;
+    cursor: pointer;
     background-position: center;
-    background-size: 70%;
+    background-repeat: no-repeat;
+    background-size: 75%;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* 3D X symbol */
 .board-cell.x {
-    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20L80 80M80 20L20 80' stroke='%23FF3B3B' stroke-width='12' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 20L80 80M80 20L20 80' stroke='%23FF3B3B' stroke-width='12' stroke-linecap='round' filter='drop-shadow(0 2px 2px rgba(0, 0, 0, 0.2))'/%3E%3C/svg%3E");
 }
 
+/* 3D O symbol */
 .board-cell.o {
-    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='50' cy='50' r='35' stroke='%232B7FFF' stroke-width='12' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='50' cy='50' r='35' stroke='%232B7FFF' stroke-width='12' stroke-linecap='round' filter='drop-shadow(0 2px 2px rgba(0, 0, 0, 0.2))'/%3E%3C/svg%3E");
 }
 
-.board-cell.x::before,
-.board-cell.x::after,
-.board-cell.o::before {
-    display: none;
+/* Hover effect */
+.board-cell:not(.x):not(.o):hover {
+    transform: scale(0.95);
 }
 
+/* Place animation */
 .board-cell.x,
 .board-cell.o {
-    animation: pieceIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    animation: pieceIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 @keyframes pieceIn {
-    from {
-        transform: scale(0);
+    0% {
+        transform: scale(0.5);
+        opacity: 0;
     }
-    to {
+    100% {
         transform: scale(1);
+        opacity: 1;
     }
 }
 
+/* Winning line with 3D effect */
 .winning-line {
     position: absolute;
-    background: var(--grid-color);
-    border-radius: calc(var(--grid-width) / 2);
+    background: var(--win-color);
+    height: 8px;
+    border-radius: 4px;
     z-index: 2;
-    transform-origin: left center;
-    animation: lineIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    opacity: 0;
+    box-shadow: 
+        0 2px 4px rgba(0, 0, 0, 0.1),
+        0 4px 8px rgba(0, 0, 0, 0.1);
+    transition: opacity 0.3s ease;
 }
 
-@keyframes lineIn {
-    from {
-        transform: scaleX(0);
-    }
-    to {
-        transform: scaleX(1);
-    }
+.winning-line.show {
+    opacity: 1;
 }
 
 .restart-button {
