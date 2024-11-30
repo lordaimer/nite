@@ -59,7 +59,8 @@ import {
     setupWhatToWatchCommand,
     setupWatchlistCommand,
     setupTruthOrDareCommand,
-    setupExtractCommand
+    setupExtractCommand,
+    setupUpscaleCommand
 } from './commands/index.js';
 
 // Import services
@@ -120,6 +121,7 @@ async function setupCommandsWithRateLimits() {
     setupTranscribeCommand(bot, rateLimitService, voiceService);
     setupWhatToWatchCommand(bot, rateLimitService);
     setupWatchlistCommand(bot, rateLimitService);
+    setupUpscaleCommand(bot);
 
     const commands = [
         { setup: setupTimeCommand, name: 'time' },
