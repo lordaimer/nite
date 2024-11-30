@@ -14,12 +14,17 @@ await fs.mkdir(TEMP_DIR, { recursive: true });
 async function downloadModel() {
     const modelUrl = 'https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-windows.zip';
     const modelZipPath = path.join(MODELS_DIR, 'model.zip');
+    const modelExePath = path.join(MODELS_DIR, 'realesrgan-ncnn-vulkan.exe');
     
     // Create models directory if it doesn't exist
     await fs.mkdir(MODELS_DIR, { recursive: true });
 
-    // Download the model if it doesn't exist
-    if (!await fs.access(path.join(MODELS_DIR, 'realesrgan-ncnn-vulkan.exe')).catch(() => false)) {
+    // Check if model exists
+    try {
+        await fs.access(modelExePath);
+        console.log('Real-ESRGAN model already exists, skipping download.');
+        return;
+    } catch {
         console.log('Downloading Real-ESRGAN model...');
         
         const response = await fetch(modelUrl);
@@ -32,6 +37,7 @@ async function downloadModel() {
         
         // Clean up zip file
         await fs.unlink(modelZipPath);
+        console.log('Real-ESRGAN model downloaded and extracted successfully.');
     }
 }
 

@@ -1,10 +1,16 @@
 import fetch from 'node-fetch';
 import sharp from 'sharp';
-import { rateLimitService } from '../../services/api/rateLimitService.js';
 import { upscaleImage } from '../../services/ai/realEsrgan.js';
+import { upscaleQueue } from '../../services/queue/upscaleQueue.js';
 
 const SUPPORTED_FORMATS = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
+// Track active upscale sessions
+const activeUpscaleSessions = new Map(); // chatId -> timestamp
+
+// Session timeout (5 minutes)
+const SESSION_TIMEOUT = 5 * 60 * 1000;
 
 async function preprocessImage(inputBuffer) {
     // Convert to PNG and ensure reasonable size for processing
@@ -17,23 +23,48 @@ async function preprocessImage(inputBuffer) {
         .toBuffer();
 }
 
-async function handleUpscale(bot, msg) {
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
+async function compressForTelegram(buffer) {
+    // Telegram's image size limit is around 10MB, let's aim for 8MB to be safe
+    const MAX_TELEGRAM_SIZE = 8 * 1024 * 1024;
+    let quality = 100;
+    let outputBuffer = buffer;
 
-    try {
-        // Check if message has a photo or is replying to a photo
-        const photo = msg.photo || (msg.reply_to_message && msg.reply_to_message.photo);
-        
-        if (!photo) {
-            await bot.sendMessage(
-                chatId,
-                '📸 Please send an image with /upscale command or reply to an image with /upscale',
-                { parse_mode: 'Markdown' }
-            );
-            return;
+    // Get initial size
+    const initialSize = buffer.length;
+    
+    if (initialSize > MAX_TELEGRAM_SIZE) {
+        // Start with JPEG conversion at high quality
+        outputBuffer = await sharp(buffer)
+            .jpeg({ quality: quality })
+            .toBuffer();
+
+        // Gradually reduce quality until we're under the size limit
+        while (outputBuffer.length > MAX_TELEGRAM_SIZE && quality > 60) {
+            quality -= 5;
+            outputBuffer = await sharp(buffer)
+                .jpeg({ quality: quality })
+                .toBuffer();
         }
 
+        // If still too large, resize the image
+        if (outputBuffer.length > MAX_TELEGRAM_SIZE) {
+            const metadata = await sharp(buffer).metadata();
+            const scale = Math.sqrt(MAX_TELEGRAM_SIZE / outputBuffer.length);
+            const newWidth = Math.floor(metadata.width * scale);
+            const newHeight = Math.floor(metadata.height * scale);
+
+            outputBuffer = await sharp(buffer)
+                .resize(newWidth, newHeight)
+                .jpeg({ quality: quality })
+                .toBuffer();
+        }
+    }
+
+    return outputBuffer;
+}
+
+async function processUpscaleJob(bot, chatId, photo) {
+    try {
         // Get the largest photo size
         const photoSize = photo[photo.length - 1];
         
@@ -48,37 +79,28 @@ async function handleUpscale(bot, msg) {
         }
         const buffer = await response.arrayBuffer();
 
-        // Send processing message
-        const processingMsg = await bot.sendMessage(chatId, '🔄 Enhancing your image using AI...\nThis might take a few moments.');
+        // Preprocess the image
+        const processedBuffer = await preprocessImage(Buffer.from(buffer));
 
-        try {
-            // Preprocess the image
-            const processedBuffer = await preprocessImage(Buffer.from(buffer));
+        // Get original dimensions
+        const metadata = await sharp(processedBuffer).metadata();
+        
+        // Upscale the image
+        const upscaledBuffer = await upscaleImage(processedBuffer, 4, true);
 
-            // Get original dimensions
-            const metadata = await sharp(processedBuffer).metadata();
-            
-            // Upscale the image
-            const upscaledBuffer = await upscaleImage(processedBuffer, 4, true);
+        // Get new dimensions
+        const newMetadata = await sharp(upscaledBuffer).metadata();
 
-            // Get new dimensions
-            const newMetadata = await sharp(upscaledBuffer).metadata();
+        // Compress the upscaled image for Telegram if needed
+        const compressedBuffer = await compressForTelegram(upscaledBuffer);
 
-            // Send the upscaled image
-            await bot.sendPhoto(chatId, upscaledBuffer, {
-                caption: `✨ Enhanced ${metadata.width}x${metadata.height} ➡️ ${newMetadata.width}x${newMetadata.height}\nUsing Real-ESRGAN with face enhancement`
-            });
-
-        } catch (upscaleError) {
-            console.error('Error during upscaling:', upscaleError);
-            throw new Error('Failed to enhance the image. The image might be too large or complex.');
-        }
-
-        // Delete processing message
-        await bot.deleteMessage(chatId, processingMsg.message_id);
+        // Send the upscaled image
+        await bot.sendPhoto(chatId, compressedBuffer, {
+            caption: `✨ Enhanced ${metadata.width}x${metadata.height} ➡️ ${newMetadata.width}x${newMetadata.height}\nUsing Real-ESRGAN with face enhancement`
+        });
 
     } catch (error) {
-        console.error('Error in upscale command:', error);
+        console.error('Error in upscale job:', error);
         await bot.sendMessage(
             chatId,
             `❌ ${error.message || 'Sorry, there was an error processing your image. Please try again with a different image.'}`,
@@ -87,21 +109,93 @@ async function handleUpscale(bot, msg) {
     }
 }
 
-export function setupUpscaleCommand(bot) {
-    bot.onText(/\/upscale/, async (msg) => {
-        const userId = msg.from.id;
-        const chatId = msg.chat.id;
+function isSessionActive(chatId) {
+    const timestamp = activeUpscaleSessions.get(chatId);
+    if (!timestamp) return false;
+    
+    // Check if session has expired
+    if (Date.now() - timestamp > SESSION_TIMEOUT) {
+        activeUpscaleSessions.delete(chatId);
+        return false;
+    }
+    return true;
+}
 
-        // Rate limit check: 3 upscales per minute
-        if (!rateLimitService.check(userId, 'upscale', 3, 60000)) {
-            await bot.sendMessage(
-                chatId,
-                '⚠️ You\'re upscaling too frequently. Please wait a moment.',
-                { parse_mode: 'Markdown' }
-            );
-            return;
+function startSession(chatId) {
+    activeUpscaleSessions.set(chatId, Date.now());
+}
+
+async function addToUpscaleQueue(bot, chatId, userId, photo) {
+    try {
+        // Update session timestamp
+        if (isSessionActive(chatId)) {
+            startSession(chatId); // Refresh the session
         }
 
-        await handleUpscale(bot, msg);
+        // Add to queue
+        const queuePosition = upscaleQueue.getQueueLength(chatId) + 1;
+        const statusMessage = queuePosition > 1 
+            ? `🔄 Added to queue. Position: ${queuePosition}`
+            : '🔄 Starting image enhancement...';
+
+        const processingMsg = await bot.sendMessage(chatId, statusMessage);
+
+        upscaleQueue.addJob(chatId, async () => {
+            await processUpscaleJob(bot, chatId, photo);
+            await bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
+        });
+
+    } catch (error) {
+        console.error('Error adding to upscale queue:', error);
+        await bot.sendMessage(
+            chatId,
+            `❌ ${error.message || 'Sorry, there was an error processing your request. Please try again.'}`,
+            { parse_mode: 'Markdown' }
+        );
+    }
+}
+
+export function setupUpscaleCommand(bot) {
+    // Handle /upscale command without image
+    bot.onText(/^\/upscale$/, async (msg) => {
+        const chatId = msg.chat.id;
+        await bot.sendMessage(
+            chatId,
+            '📸 To upscale images, you can:\n\n1. Reply to an image with /upscale\n2. Send an image with /upscale as caption\n3. Send multiple images with /upscale as caption to batch process them',
+            { parse_mode: 'Markdown' }
+        );
+    });
+
+    // Handle /upscale command with image or reply
+    bot.onText(/\/upscale/, async (msg) => {
+        // Skip if it's just /upscale without image (handled by previous handler)
+        if (msg.text === '/upscale' && !msg.reply_to_message) return;
+
+        const chatId = msg.chat.id;
+        const userId = msg.from.id;
+        
+        // Check if message has a photo or is replying to a photo
+        const photo = msg.photo || (msg.reply_to_message && msg.reply_to_message.photo);
+        
+        if (photo) {
+            await addToUpscaleQueue(bot, chatId, userId, photo);
+            if (!isSessionActive(chatId)) {
+                startSession(chatId);
+            }
+        }
+    });
+
+    // Handle any photos sent during active session
+    bot.on('photo', async (msg) => {
+        const chatId = msg.chat.id;
+        const userId = msg.from.id;
+
+        // Skip if photo has /upscale command (handled by command handler)
+        if (msg.caption && msg.caption.includes('/upscale')) return;
+
+        // Process photo if there's an active session
+        if (isSessionActive(chatId)) {
+            await addToUpscaleQueue(bot, chatId, userId, msg.photo);
+        }
     });
 }
