@@ -1,8 +1,9 @@
 class UpscaleQueue {
     constructor() {
         this.globalQueue = []; // Array of {chatId, job} objects
-        this.processing = new Set(); // Set of currently processing chatIds
+        this.processing = new Map(); // Map of chatId -> number of jobs processing
         this.MAX_CONCURRENT_JOBS = 2; // Maximum number of parallel processes
+        this.MAX_PER_USER = 2; // Maximum concurrent jobs per user
     }
 
     // Add a job to the queue
@@ -14,25 +15,32 @@ class UpscaleQueue {
     // Process the next jobs in the queue
     async processQueue() {
         // If we're at max capacity, return
-        if (this.processing.size >= this.MAX_CONCURRENT_JOBS) {
+        const totalProcessing = Array.from(this.processing.values()).reduce((a, b) => a + b, 0);
+        if (totalProcessing >= this.MAX_CONCURRENT_JOBS) {
             return;
         }
 
         // Process as many jobs as we can up to MAX_CONCURRENT_JOBS
-        while (this.processing.size < this.MAX_CONCURRENT_JOBS && this.globalQueue.length > 0) {
+        while (totalProcessing < this.MAX_CONCURRENT_JOBS && this.globalQueue.length > 0) {
             const nextJob = this.globalQueue[0];
+            const userProcessing = this.processing.get(nextJob.chatId) || 0;
             
-            // Skip if this chat already has a job processing
-            if (this.processing.has(nextJob.chatId)) {
-                // If next job is from same chat, break to maintain order
+            // Skip if this user is at their max concurrent jobs
+            if (userProcessing >= this.MAX_PER_USER) {
+                // Check next job
+                if (this.globalQueue.length > 1) {
+                    // Move this job to the end and try the next one
+                    this.globalQueue.push(this.globalQueue.shift());
+                    continue;
+                }
                 break;
             }
 
             // Remove the job from queue
             this.globalQueue.shift();
             
-            // Mark as processing
-            this.processing.add(nextJob.chatId);
+            // Increment processing count for this user
+            this.processing.set(nextJob.chatId, userProcessing + 1);
 
             // Process the job
             this.processJob(nextJob.chatId, nextJob.job);
@@ -46,8 +54,13 @@ class UpscaleQueue {
         } catch (error) {
             console.error('Error processing upscale job:', error);
         } finally {
-            // Remove from processing set
-            this.processing.delete(chatId);
+            // Decrement processing count for this user
+            const userProcessing = this.processing.get(chatId) - 1;
+            if (userProcessing <= 0) {
+                this.processing.delete(chatId);
+            } else {
+                this.processing.set(chatId, userProcessing);
+            }
             
             // Process next jobs
             this.processQueue();
@@ -64,9 +77,9 @@ class UpscaleQueue {
         return this.globalQueue.length;
     }
 
-    // Check if processing for a chat
-    isProcessing(chatId) {
-        return this.processing.has(chatId);
+    // Check if processing for a chat and get count
+    getProcessingCount(chatId) {
+        return this.processing.get(chatId) || 0;
     }
 
     // Get queue position for a chat's next job
@@ -75,9 +88,9 @@ class UpscaleQueue {
         return index === -1 ? 0 : index + 1;
     }
 
-    // Get number of currently processing jobs
-    getProcessingCount() {
-        return this.processing.size;
+    // Get total number of processing jobs
+    getTotalProcessingCount() {
+        return Array.from(this.processing.values()).reduce((a, b) => a + b, 0);
     }
 }
 

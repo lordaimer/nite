@@ -135,18 +135,19 @@ async function addToUpscaleQueue(bot, chatId, userId, photo) {
 
         // Get queue status
         const queuePosition = upscaleQueue.getQueuePosition(chatId);
-        const isProcessing = upscaleQueue.isProcessing(chatId);
-        const totalProcessing = upscaleQueue.getProcessingCount();
+        const userProcessing = upscaleQueue.getProcessingCount(chatId);
+        const totalProcessing = upscaleQueue.getTotalProcessingCount();
         const queueLength = upscaleQueue.getTotalQueueLength();
 
         // Prepare status message
         let statusMessage;
-        if (totalProcessing < 2 && !isProcessing && queueLength === 0) {
+        if (totalProcessing < 2 && userProcessing === 0 && queueLength === 0) {
             statusMessage = '🔄 Starting image enhancement...';
         } else {
-            statusMessage = `🔄 Image ${isProcessing ? 'processing' : 'queued for processing'}\n` +
+            statusMessage = `🔄 Image ${userProcessing > 0 ? 'processing' : 'queued for processing'}\n` +
                           `📊 Position in queue: ${queuePosition}\n` +
-                          `⚡ Currently processing: ${totalProcessing}/2 slots in use\n` +
+                          `⚡ Your processing slots: ${userProcessing}/2\n` +
+                          `💫 Total processing: ${totalProcessing}/2 slots\n` +
                           `📝 Total images in queue: ${queueLength}`;
         }
 
@@ -176,7 +177,9 @@ async function addToUpscaleQueue(bot, chatId, userId, photo) {
                 if (remainingJobs > 0) {
                     await bot.sendMessage(
                         chatId,
-                        `✅ Image processed!\n📊 ${remainingJobs} more image${remainingJobs > 1 ? 's' : ''} in queue`,
+                        `✅ Image processed!\n` +
+                        `📊 ${remainingJobs} more image${remainingJobs > 1 ? 's' : ''} in queue\n` +
+                        `⚡ Currently processing: ${upscaleQueue.getProcessingCount(chatId)}/2 of your slots`,
                         { parse_mode: 'Markdown' }
                     );
                 }
