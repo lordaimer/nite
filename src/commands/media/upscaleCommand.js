@@ -128,22 +128,69 @@ function startSession(chatId) {
 
 async function addToUpscaleQueue(bot, chatId, userId, photo) {
     try {
-        // Update session timestamp
+        // Update session timestamp if active
         if (isSessionActive(chatId)) {
             startSession(chatId); // Refresh the session
         }
 
-        // Add to queue
-        const queuePosition = upscaleQueue.getQueueLength(chatId) + 1;
-        const statusMessage = queuePosition > 1 
-            ? `🔄 Added to queue. Position: ${queuePosition}`
-            : '🔄 Starting image enhancement...';
+        // Get queue status
+        const queuePosition = upscaleQueue.getQueuePosition(chatId);
+        const isProcessing = upscaleQueue.isProcessing(chatId);
+        const totalProcessing = upscaleQueue.getProcessingCount();
+        const queueLength = upscaleQueue.getTotalQueueLength();
 
-        const processingMsg = await bot.sendMessage(chatId, statusMessage);
+        // Prepare status message
+        let statusMessage;
+        if (totalProcessing < 2 && !isProcessing && queueLength === 0) {
+            statusMessage = '🔄 Starting image enhancement...';
+        } else {
+            statusMessage = `🔄 Image ${isProcessing ? 'processing' : 'queued for processing'}\n` +
+                          `📊 Position in queue: ${queuePosition}\n` +
+                          `⚡ Currently processing: ${totalProcessing}/2 slots in use\n` +
+                          `📝 Total images in queue: ${queueLength}`;
+        }
 
+        const processingMsg = await bot.sendMessage(chatId, statusMessage, { parse_mode: 'Markdown' });
+
+        // Add job to queue
         upscaleQueue.addJob(chatId, async () => {
-            await processUpscaleJob(bot, chatId, photo);
-            await bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
+            try {
+                // Update message to show processing status
+                await bot.editMessageText(
+                    '🔄 Processing your image...',
+                    {
+                        chat_id: chatId,
+                        message_id: processingMsg.message_id,
+                        parse_mode: 'Markdown'
+                    }
+                ).catch(() => {});
+
+                // Process the image
+                await processUpscaleJob(bot, chatId, photo);
+
+                // Delete the status message
+                await bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
+
+                // If there are more items in queue, show updated status
+                const remainingJobs = upscaleQueue.getQueueLength(chatId);
+                if (remainingJobs > 0) {
+                    await bot.sendMessage(
+                        chatId,
+                        `✅ Image processed!\n📊 ${remainingJobs} more image${remainingJobs > 1 ? 's' : ''} in queue`,
+                        { parse_mode: 'Markdown' }
+                    );
+                }
+            } catch (error) {
+                console.error('Error processing upscale job:', error);
+                await bot.editMessageText(
+                    `❌ Error processing image: ${error.message || 'Unknown error'}`,
+                    {
+                        chat_id: chatId,
+                        message_id: processingMsg.message_id,
+                        parse_mode: 'Markdown'
+                    }
+                ).catch(() => {});
+            }
         });
 
     } catch (error) {
