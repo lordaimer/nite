@@ -129,7 +129,7 @@ function startSession(chatId) {
     activeUpscaleSessions.set(chatId, Date.now());
 }
 
-async function addToUpscaleQueue(bot, chatId, userId, photo) {
+export async function addToUpscaleQueue(bot, chatId, userId, photo) {
     try {
         // Update session timestamp if active
         if (isSessionActive(chatId)) {

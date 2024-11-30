@@ -1,5 +1,6 @@
 import { HfInference } from '@huggingface/inference';
 import dotenv from 'dotenv';
+import { addToUpscaleQueue } from './upscaleCommand.js';
 
 // Ensure environment variables are loaded
 dotenv.config();
@@ -54,7 +55,7 @@ export function setupImageCommand(bot, rateLimit) {
             },
             {
                 text: '✨ Upscale',
-                callback_data: 'upscale_pending'
+                callback_data: `upscale_${promptId}`
             }
         ]]
     });
@@ -133,6 +134,31 @@ export function setupImageCommand(bot, rateLimit) {
     bot.on('callback_query', async (query) => {
         const chatId = query.message.chat.id;
         const messageId = query.message.message_id;
+
+        // Handle upscale button
+        if (query.data.startsWith('upscale_')) {
+            const photo = query.message.photo;
+            if (!photo) {
+                await bot.answerCallbackQuery(query.id, {
+                    text: '❌ Cannot find the image to upscale.',
+                    show_alert: true
+                });
+                return;
+            }
+
+            try {
+                await addToUpscaleQueue(bot, chatId, query.from.id, photo);
+                await bot.answerCallbackQuery(query.id, {
+                    text: '✨ Image added to upscale queue!'
+                });
+            } catch (error) {
+                await bot.answerCallbackQuery(query.id, {
+                    text: '❌ Failed to upscale image. Please try again.',
+                    show_alert: true
+                });
+            }
+            return;
+        }
 
         // Handle model selection
         if (query.data.startsWith('generate_')) {
