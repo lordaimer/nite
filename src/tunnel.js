@@ -25,7 +25,9 @@ async function attemptTunnelSetup() {
             }
 
             // Start cloudflared tunnel as a child process
-            tunnelProcess = spawn(cloudflaredPath, ['tunnel', '--url', `http://localhost:${port}`]);
+            tunnelProcess = spawn(cloudflaredPath, ['tunnel', '--url', `http://localhost:${port}`], {
+                windowsHide: true
+            });
 
             // Handle tunnel output
             tunnelProcess.stdout.on('data', (data) => {
