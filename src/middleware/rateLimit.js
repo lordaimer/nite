@@ -1,6 +1,6 @@
 const userRateLimits = new Map();
-const RATE_LIMIT_WINDOW = 1000; // 1 second
-const MAX_REQUESTS = 3; // Maximum 3 requests per second
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const MAX_REQUESTS = 20; // Maximum 20 messages per minute (Telegram's limit)
 
 export function rateLimitMiddleware(userId) {
     // Admin bypass - always allow admin user

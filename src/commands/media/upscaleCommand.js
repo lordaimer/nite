@@ -8,6 +8,7 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 // Track active upscale sessions
 const activeUpscaleSessions = new Map(); // chatId -> timestamp
+const pendingUpscaleRequests = new Map(); // chatId -> boolean
 
 // Session timeout (5 minutes)
 const SESSION_TIMEOUT = 5 * 60 * 1000;
@@ -161,11 +162,12 @@ export function setupUpscaleCommand(bot) {
         const chatId = msg.chat.id;
         const userId = msg.from.id;
 
-        // If it's just /upscale without reply, show help message
+        // If it's just /upscale without reply, show help message and mark as pending
         if (msg.text === '/upscale' && !msg.reply_to_message) {
+            pendingUpscaleRequests.set(chatId, true);
             await bot.sendMessage(
                 chatId,
-                '📸 To upscale images, you can:\n\n1. Reply to an image with /upscale\n2. Send an image with /upscale as caption\n3. Send multiple images with /upscale as caption to batch process them',
+                '📸 Send me an image to upscale, or you can:\n\n1. Reply to an image with /upscale\n2. Send an image with /upscale as caption\n3. Send multiple images with /upscale as caption to batch process them',
                 { parse_mode: 'Markdown' }
             );
             return;
@@ -175,6 +177,7 @@ export function setupUpscaleCommand(bot) {
         const photo = msg.photo || (msg.reply_to_message && msg.reply_to_message.photo);
         
         if (photo) {
+            pendingUpscaleRequests.delete(chatId); // Clear any pending request
             await addToUpscaleQueue(bot, chatId, userId, photo);
             if (!isSessionActive(chatId)) {
                 startSession(chatId);
@@ -182,7 +185,7 @@ export function setupUpscaleCommand(bot) {
         }
     });
 
-    // Handle any photos sent during active session
+    // Handle any photos sent during active session or pending request
     bot.on('photo', async (msg) => {
         const chatId = msg.chat.id;
         const userId = msg.from.id;
@@ -190,9 +193,27 @@ export function setupUpscaleCommand(bot) {
         // Skip if photo has /upscale command (handled by command handler)
         if (msg.caption && msg.caption.includes('/upscale')) return;
 
+        // Check if there's a pending upscale request
+        if (pendingUpscaleRequests.has(chatId)) {
+            pendingUpscaleRequests.delete(chatId);
+            await addToUpscaleQueue(bot, chatId, userId, msg.photo);
+            if (!isSessionActive(chatId)) {
+                startSession(chatId);
+            }
+            return;
+        }
+
         // Process photo if there's an active session
         if (isSessionActive(chatId)) {
             await addToUpscaleQueue(bot, chatId, userId, msg.photo);
+        }
+    });
+
+    // Clear pending requests when user sends other commands
+    bot.on('text', (msg) => {
+        const chatId = msg.chat.id;
+        if (msg.text.startsWith('/') && msg.text !== '/upscale') {
+            pendingUpscaleRequests.delete(chatId);
         }
     });
 }
