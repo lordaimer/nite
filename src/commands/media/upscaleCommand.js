@@ -1,10 +1,21 @@
-import sharp from 'sharp';
 import fetch from 'node-fetch';
+import sharp from 'sharp';
 import { rateLimitService } from '../../services/api/rateLimitService.js';
+import { upscaleImage } from '../../services/ai/realEsrgan.js';
 
 const SUPPORTED_FORMATS = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const SCALE_FACTOR = 2; // 2x upscaling
+
+async function preprocessImage(inputBuffer) {
+    // Convert to PNG and ensure reasonable size for processing
+    return await sharp(inputBuffer)
+        .resize(1024, 1024, { // Limit initial size for faster processing
+            fit: 'inside',
+            withoutEnlargement: true
+        })
+        .png()
+        .toBuffer();
+}
 
 async function handleUpscale(bot, msg) {
     const chatId = msg.chat.id;
@@ -38,28 +49,30 @@ async function handleUpscale(bot, msg) {
         const buffer = await response.arrayBuffer();
 
         // Send processing message
-        const processingMsg = await bot.sendMessage(chatId, '🔄 Processing your image...');
+        const processingMsg = await bot.sendMessage(chatId, '🔄 Enhancing your image using AI...\nThis might take a few moments.');
 
-        // Process the image with sharp
-        const image = sharp(Buffer.from(buffer));
-        const metadata = await image.metadata();
+        try {
+            // Preprocess the image
+            const processedBuffer = await preprocessImage(Buffer.from(buffer));
 
-        // Calculate new dimensions
-        const newWidth = metadata.width * SCALE_FACTOR;
-        const newHeight = metadata.height * SCALE_FACTOR;
+            // Get original dimensions
+            const metadata = await sharp(processedBuffer).metadata();
+            
+            // Upscale the image
+            const upscaledBuffer = await upscaleImage(processedBuffer, 4, true);
 
-        // Upscale the image
-        const upscaledBuffer = await image
-            .resize(newWidth, newHeight, {
-                kernel: sharp.kernel.lanczos3,
-                fit: 'fill'
-            })
-            .toBuffer();
+            // Get new dimensions
+            const newMetadata = await sharp(upscaledBuffer).metadata();
 
-        // Send the upscaled image
-        await bot.sendPhoto(chatId, upscaledBuffer, {
-            caption: `✨ Upscaled ${metadata.width}x${metadata.height} ➡️ ${newWidth}x${newHeight}`
-        });
+            // Send the upscaled image
+            await bot.sendPhoto(chatId, upscaledBuffer, {
+                caption: `✨ Enhanced ${metadata.width}x${metadata.height} ➡️ ${newMetadata.width}x${newMetadata.height}\nUsing Real-ESRGAN with face enhancement`
+            });
+
+        } catch (upscaleError) {
+            console.error('Error during upscaling:', upscaleError);
+            throw new Error('Failed to enhance the image. The image might be too large or complex.');
+        }
 
         // Delete processing message
         await bot.deleteMessage(chatId, processingMsg.message_id);
@@ -68,7 +81,7 @@ async function handleUpscale(bot, msg) {
         console.error('Error in upscale command:', error);
         await bot.sendMessage(
             chatId,
-            '❌ Sorry, there was an error processing your image. Please try again with a different image.',
+            `❌ ${error.message || 'Sorry, there was an error processing your image. Please try again with a different image.'}`,
             { parse_mode: 'Markdown' }
         );
     }
@@ -79,8 +92,8 @@ export function setupUpscaleCommand(bot) {
         const userId = msg.from.id;
         const chatId = msg.chat.id;
 
-        // Rate limit check: 5 upscales per minute
-        if (!rateLimitService.check(userId, 'upscale', 5, 60000)) {
+        // Rate limit check: 3 upscales per minute
+        if (!rateLimitService.check(userId, 'upscale', 3, 60000)) {
             await bot.sendMessage(
                 chatId,
                 '⚠️ You\'re upscaling too frequently. Please wait a moment.',
