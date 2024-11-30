@@ -156,23 +156,20 @@ async function addToUpscaleQueue(bot, chatId, userId, photo) {
 }
 
 export function setupUpscaleCommand(bot) {
-    // Handle /upscale command without image
-    bot.onText(/^\/upscale$/, async (msg) => {
-        const chatId = msg.chat.id;
-        await bot.sendMessage(
-            chatId,
-            '📸 To upscale images, you can:\n\n1. Reply to an image with /upscale\n2. Send an image with /upscale as caption\n3. Send multiple images with /upscale as caption to batch process them',
-            { parse_mode: 'Markdown' }
-        );
-    });
-
     // Handle /upscale command with image or reply
     bot.onText(/\/upscale/, async (msg) => {
-        // Skip if it's just /upscale without image (handled by previous handler)
-        if (msg.text === '/upscale' && !msg.reply_to_message) return;
-
         const chatId = msg.chat.id;
         const userId = msg.from.id;
+
+        // If it's just /upscale without reply, show help message
+        if (msg.text === '/upscale' && !msg.reply_to_message) {
+            await bot.sendMessage(
+                chatId,
+                '📸 To upscale images, you can:\n\n1. Reply to an image with /upscale\n2. Send an image with /upscale as caption\n3. Send multiple images with /upscale as caption to batch process them',
+                { parse_mode: 'Markdown' }
+            );
+            return;
+        }
         
         // Check if message has a photo or is replying to a photo
         const photo = msg.photo || (msg.reply_to_message && msg.reply_to_message.photo);
