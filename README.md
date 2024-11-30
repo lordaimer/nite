@@ -14,6 +14,7 @@ Niite Bot is a feature-rich Telegram bot that combines AI capabilities with util
 - Image generation using multiple Hugging Face models
 - Smart model selection for different art styles
 - Image regeneration and customization options
+- AI-powered image upscaling with Real-ESRGAN (4x upscaling with face enhancement)
 
 ### Information Services
 - Real-time timezone information
@@ -38,6 +39,8 @@ Niite Bot is a feature-rich Telegram bot that combines AI capabilities with util
   - @google/generative-ai
   - moment-timezone
   - natural (NLP)
+  - sharp (image processing)
+  - extract-zip
   - dotenv
 
 ## 🚀 Getting Started
@@ -47,14 +50,22 @@ Niite Bot is a feature-rich Telegram bot that combines AI capabilities with util
 ```bash
 npm install
 ```
-3. Create a `.env` file with required credentials:
+3. Install Vulkan Runtime (Required for AI image upscaling):
+   - Download from [Vulkan Runtime](https://sdk.lunarg.com/sdk/download/1.3.268.0/windows/VulkanRT-1.3.268.0-Installer.exe)
+   - Run the installer
+   - Restart your system if prompted
+
+4. Create a `.env` file with required credentials:
 ```env
 TELEGRAM_BOT_TOKEN=your_token
 HUGGING_FACE_TOKEN=your_token
 GOOGLE_AI_API_KEY=your_key
 ADMIN_USER_ID=your_admin_id
+UNSPLASH_ACCESS_KEY=your_key
+PIXABAY_API_KEY=your_key
+NINJA_API_KEY=your_key
 ```
-4. Start the bot:
+5. Start the bot:
 ```bash
 node bot.js
 ```

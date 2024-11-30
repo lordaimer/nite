@@ -216,7 +216,18 @@ I am a versatile personal assistant bot currently under development.`;
             ],
             category: 'Support',
             note: '\nBug reports are reviewed by administrators. Please provide clear and detailed descriptions to help improve the bot.'
-        }
+        },
+        {
+            command: '/upscale',
+            description: 'Enhance image quality using AI',
+            usage: '/upscale [reply to image or send with image]',
+            examples: [
+                '/upscale - Send with an image',
+                '/upscale - Reply to an image'
+            ],
+            category: 'Media',
+            note: '\nUses Real-ESRGAN AI model for 4x upscaling with face enhancement. Maximum file size: 5MB.'
+        },
     ];
 
     // Handle /help or /? command
