@@ -10,6 +10,9 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const activeUpscaleSessions = new Map(); // chatId -> timestamp
 const pendingUpscaleRequests = new Map(); // chatId -> boolean
 
+// Track media groups being processed
+const mediaGroupsInProgress = new Set();
+
 // Session timeout (5 minutes)
 const SESSION_TIMEOUT = 5 * 60 * 1000;
 
@@ -223,37 +226,76 @@ export function setupUpscaleCommand(bot) {
             return;
         }
         
-        // Check if message has a photo or is replying to a photo
-        const photo = msg.photo || (msg.reply_to_message && msg.reply_to_message.photo);
-        
-        if (photo) {
-            pendingUpscaleRequests.delete(chatId); // Clear any pending request
-            await addToUpscaleQueue(bot, chatId, userId, photo);
+        // Handle single photo in message or reply
+        if (msg.photo || (msg.reply_to_message && msg.reply_to_message.photo)) {
+            const photo = msg.photo || msg.reply_to_message.photo;
+            pendingUpscaleRequests.delete(chatId);
+            
             if (!isSessionActive(chatId)) {
                 startSession(chatId);
             }
+            
+            await addToUpscaleQueue(bot, chatId, userId, photo);
         }
     });
 
-    // Handle any photos sent during active session or pending request
+    // Handle photos sent during active session or pending request
     bot.on('photo', async (msg) => {
         const chatId = msg.chat.id;
         const userId = msg.from.id;
+        const mediaGroupId = msg.media_group_id;
 
-        // Skip if photo has /upscale command (handled by command handler)
-        if (msg.caption && msg.caption.includes('/upscale')) return;
+        // If part of a media group and has /upscale caption
+        if (mediaGroupId && msg.caption && msg.caption.includes('/upscale')) {
+            // Skip if we're already processing this media group
+            if (mediaGroupsInProgress.has(mediaGroupId)) {
+                return;
+            }
 
-        // Check if there's a pending upscale request
-        if (pendingUpscaleRequests.has(chatId)) {
-            pendingUpscaleRequests.delete(chatId);
-            await addToUpscaleQueue(bot, chatId, userId, msg.photo);
+            // Mark this media group as being processed
+            mediaGroupsInProgress.add(mediaGroupId);
+            
+            // Start session
             if (!isSessionActive(chatId)) {
                 startSession(chatId);
             }
+
+            // Queue this photo
+            await addToUpscaleQueue(bot, chatId, userId, msg.photo);
+
+            // Send confirmation for first photo
+            await bot.sendMessage(
+                chatId,
+                '✅ Processing media group... Send all your images!',
+                { parse_mode: 'Markdown' }
+            );
+
+            // Clean up after 5 seconds
+            setTimeout(() => {
+                mediaGroupsInProgress.delete(mediaGroupId);
+            }, 5000);
+            
             return;
         }
 
-        // Process photo if there's an active session
+        // If part of a media group during active session
+        if (mediaGroupId && isSessionActive(chatId)) {
+            // Queue this photo
+            await addToUpscaleQueue(bot, chatId, userId, msg.photo);
+            return;
+        }
+
+        // Handle single photo with pending request
+        if (pendingUpscaleRequests.has(chatId)) {
+            pendingUpscaleRequests.delete(chatId);
+            if (!isSessionActive(chatId)) {
+                startSession(chatId);
+            }
+            await addToUpscaleQueue(bot, chatId, userId, msg.photo);
+            return;
+        }
+
+        // Handle single photo during active session
         if (isSessionActive(chatId)) {
             await addToUpscaleQueue(bot, chatId, userId, msg.photo);
         }
