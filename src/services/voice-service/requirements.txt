@@ -1,0 +1,19 @@
+torch>=2.0.0
+torchaudio>=2.0.0
+accelerate>=0.33.0
+transformers
+vocos
+torchdiffeq
+x_transformers>=1.31.14
+librosa
+soundfile
+pydub
+fastapi>=0.68.0
+uvicorn>=0.15.0
+python-multipart
+numpy<=1.26.4
+cached_path
+ema_pytorch>=0.5.2
+safetensors
+toml
+f5-tts @ git+https://github.com/SWivid/F5-TTS.git

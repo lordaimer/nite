@@ -144,3 +144,8 @@ src/data/botState.json
 src/data/bugs.json
 src/data/*.db 
 dbquery.js
+
+
+# Voice Clone Configuration
+
+src/services/voice-service/venv/*
