@@ -10,7 +10,10 @@ export function validateEnvironment() {
         'NINJA_API_KEY',
         'UNSPLASH_ACCESS_KEY',
         'PIXABAY_API_KEY',
-        'HUGGING_FACE_TOKEN',
+        'HUGGING_FACE_TOKEN_1',
+        'HUGGING_FACE_TOKEN_2',
+        'HUGGING_FACE_TOKEN_3',
+        'HUGGING_FACE_TOKEN_4',
         'ELEVENLABS_API_KEY',
         'OMDB_API_KEY',
         'TMDB_API_KEY',
@@ -49,7 +52,12 @@ export const config = {
         apiKey: process.env.PIXABAY_API_KEY
     },
     huggingface: {
-        token: process.env.HUGGING_FACE_TOKEN
+        tokens: [
+            process.env.HUGGING_FACE_TOKEN_1,
+            process.env.HUGGING_FACE_TOKEN_2,
+            process.env.HUGGING_FACE_TOKEN_3,
+            process.env.HUGGING_FACE_TOKEN_4
+        ]
     },
     elevenlabs: {
         apiKey: process.env.ELEVENLABS_API_KEY

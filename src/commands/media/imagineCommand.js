@@ -1,11 +1,5 @@
-import { HfInference } from '@huggingface/inference';
-import dotenv from 'dotenv';
+import huggingFaceService from '../../services/api/huggingFaceService.js';
 import { addToUpscaleQueue } from './upscaleCommand.js';
-
-// Ensure environment variables are loaded
-dotenv.config();
-
-const hf = new HfInference(process.env.HUGGING_FACE_TOKEN);
 
 const MODELS = {
     'FLUX Dev': 'black-forest-labs/FLUX.1-dev',
@@ -17,18 +11,41 @@ const MODELS = {
 };
 
 const generateImage = async (modelId, prompt) => {
-    // Add timestamp and random seed to prompt to force unique generation
     const timestamp = Date.now();
     const randomSeed = Math.floor(Math.random() * 2147483647);
     const randomizedPrompt = `${prompt} [t:${timestamp}] [s:${randomSeed}]`;
     
     try {
-        return await hf.textToImage({
-            model: modelId,
-            inputs: randomizedPrompt
-        });
+        const result = await huggingFaceService.generateImage(randomizedPrompt, modelId);
+        return result;
     } catch (error) {
         console.error(`Error generating image: ${error.message}`);
+        throw error;
+    }
+};
+
+const generateVariety = async (prompt) => {
+    const timestamp = Date.now();
+    const randomSeed = Math.floor(Math.random() * 2147483647);
+    const randomizedPrompt = `${prompt} [t:${timestamp}] [s:${randomSeed}]`;
+
+    try {
+        const modelEntries = Object.entries(MODELS);
+        const results = [];
+        
+        for (const [modelName, modelId] of modelEntries) {
+            try {
+                const result = await huggingFaceService.generateImage(randomizedPrompt, modelId);
+                results.push({ modelName, image: result });
+            } catch (error) {
+                console.error(`Error generating image for ${modelName}: ${error.message}`);
+                // Continue with other models even if one fails
+            }
+        }
+        
+        return results;
+    } catch (error) {
+        console.error(`Error in variety generation: ${error.message}`);
         throw error;
     }
 };
@@ -37,6 +54,14 @@ export function setupImageCommand(bot, rateLimit) {
     const userSessions = new Map();
     const promptCache = new Map();
     let promptCounter = 0;
+
+    // Helper function to create initial mode selection keyboard
+    const getModeKeyboard = () => ({
+        inline_keyboard: [[
+            { text: '🎨 Select Model', callback_data: 'mode_select' },
+            { text: '🎯 Variety', callback_data: 'mode_variety' }
+        ]]
+    });
 
     // Helper function to create model selection keyboard
     const getModelKeyboard = () => ({
@@ -107,14 +132,6 @@ export function setupImageCommand(bot, rateLimit) {
             originalMessageId: msg.message_id
         });
         
-        // Clear previous prompts for this chat
-        for (const [key, value] of promptCache.entries()) {
-            if (userSessions.get(value.chatId)?.promptId === key) {
-                promptCache.delete(key);
-                userSessions.delete(value.chatId);
-            }
-        }
-        
         // Store new prompt with chat ID
         promptCache.set(promptId, {
             prompt: prompt,
@@ -123,9 +140,9 @@ export function setupImageCommand(bot, rateLimit) {
         
         await bot.sendMessage(
             chatId,
-            '🎨 Choose a model for image generation:',
+            '🎨 Choose generation mode:',
             { 
-                reply_markup: getModelKeyboard(),
+                reply_markup: getModeKeyboard(),
                 reply_to_message_id: msg.message_id
             }
         );
@@ -134,6 +151,71 @@ export function setupImageCommand(bot, rateLimit) {
     bot.on('callback_query', async (query) => {
         const chatId = query.message.chat.id;
         const messageId = query.message.message_id;
+
+        // Handle mode selection
+        if (query.data === 'mode_select') {
+            await bot.editMessageText(
+                '🎨 Choose a model for image generation:',
+                {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    reply_markup: getModelKeyboard()
+                }
+            );
+            await bot.answerCallbackQuery(query.id);
+            return;
+        }
+
+        // Handle variety mode
+        if (query.data === 'mode_variety') {
+            const session = userSessions.get(chatId);
+            if (!session) {
+                await bot.answerCallbackQuery(query.id, {
+                    text: '❌ Session expired. Please start over with /imagine command.',
+                    show_alert: true
+                });
+                return;
+            }
+
+            await bot.editMessageText(
+                '🎨 Generating variety of images...',
+                {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    reply_markup: { inline_keyboard: [] }
+                }
+            );
+
+            try {
+                const results = await generateVariety(session.prompt);
+                
+                // Send all generated images
+                for (const { modelName, image } of results) {
+                    const buffer = Buffer.from(await image.arrayBuffer());
+                    await bot.sendPhoto(chatId, buffer, {
+                        caption: `*${modelName}*`,
+                        parse_mode: 'Markdown',
+                        reply_to_message_id: session.originalMessageId,
+                        reply_markup: getImageActionButtons(session.promptId)
+                    });
+                }
+
+                // Delete the "Generating..." message
+                await bot.deleteMessage(chatId, messageId);
+            } catch (error) {
+                await bot.editMessageText(
+                    '❌ Failed to generate variety of images. Please try again.',
+                    {
+                        chat_id: chatId,
+                        message_id: messageId
+                    }
+                );
+            }
+
+            userSessions.delete(chatId);
+            await bot.answerCallbackQuery(query.id);
+            return;
+        }
 
         // Handle upscale button
         if (query.data.startsWith('upscale_')) {
@@ -177,7 +259,7 @@ export function setupImageCommand(bot, rateLimit) {
             const prompt = session.prompt;
 
             await bot.editMessageText(
-                `🎨 Generating image using ${modelName}...`,
+                '🎨 Generating images...',
                 {
                     chat_id: chatId,
                     message_id: messageId,
@@ -186,24 +268,28 @@ export function setupImageCommand(bot, rateLimit) {
             );
 
             try {
-                const response = await generateImage(modelId, prompt);
-                const buffer = Buffer.from(await response.arrayBuffer());
+                // Generate multiple images from the same model
+                const numImages = 5;
+                const imagePromises = Array(numImages).fill().map(() => generateImage(modelId, prompt));
+                const responses = await Promise.all(imagePromises);
 
-                // Send image with regenerate and upscale buttons
-                await bot.sendPhoto(chatId, buffer, {
-                    caption: `*${modelName}*`,
-                    parse_mode: 'Markdown',
-                    reply_to_message_id: session.originalMessageId,
-                    reply_markup: getImageActionButtons(session.promptId)
-                });
+                // Send all generated images
+                for (const response of responses) {
+                    const buffer = Buffer.from(await response.arrayBuffer());
+                    await bot.sendPhoto(chatId, buffer, {
+                        caption: `*${modelName}*`,
+                        parse_mode: 'Markdown',
+                        reply_to_message_id: session.originalMessageId,
+                        reply_markup: getImageActionButtons(session.promptId)
+                    });
+                }
 
                 // Delete the "Generating..." message
                 await bot.deleteMessage(chatId, messageId);
-
             } catch (error) {
                 try {
                     await bot.editMessageText(
-                        `❌ Failed to generate image using ${modelName}. Please try again.`,
+                        `❌ Failed to generate images using ${modelName}. Please try again.`,
                         {
                             chat_id: chatId,
                             message_id: messageId
@@ -212,7 +298,7 @@ export function setupImageCommand(bot, rateLimit) {
                 } catch (editError) {
                     await bot.sendMessage(
                         chatId,
-                        `❌ Failed to generate image using ${modelName}. Please try again.`,
+                        `❌ Failed to generate images using ${modelName}. Please try again.`,
                         {
                             reply_to_message_id: session.originalMessageId
                         }
@@ -250,9 +336,9 @@ export function setupImageCommand(bot, rateLimit) {
 
             await bot.sendMessage(
                 chatId,
-                '🎨 Choose a model for regeneration:',
+                '🎨 Choose generation mode:',
                 { 
-                    reply_markup: getModelKeyboard(),
+                    reply_markup: getModeKeyboard(),
                     reply_to_message_id: query.message.reply_to_message?.message_id
                 }
             );

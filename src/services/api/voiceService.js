@@ -14,10 +14,10 @@ const readFile = promisify(fs.readFile);
 
 class VoiceService {
     constructor() {
-        if (!process.env.HUGGING_FACE_TOKEN) {
-            throw new Error('HUGGING_FACE_TOKEN is not set in environment variables');
+        if (!process.env.HUGGING_FACE_TOKEN_1) {
+            throw new Error('HUGGING_FACE_TOKEN_1 is not set in environment variables');
         }
-        this.hf = new HfInference(process.env.HUGGING_FACE_TOKEN);
+        this.hf = new HfInference(process.env.HUGGING_FACE_TOKEN_1);
     }
 
     async downloadVoice(fileUrl) {
