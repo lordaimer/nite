@@ -150,8 +150,26 @@ export async function addToUpscaleQueue(bot, chatId, userId, photo) {
         if (!pendingUpscaleRequests.get(chatId)) {
             pendingUpscaleRequests.set(chatId, true);
             
-            const statusMessage = `🔄 Processing your images...`;
-            const processingMsg = await bot.sendMessage(chatId, statusMessage, { parse_mode: 'Markdown' });
+            const processingMsg = await bot.sendMessage(
+                chatId, 
+                "*Processing your images* ◡", 
+                { parse_mode: 'Markdown' }
+            );
+
+            // Animation frames
+            const frames = ['◜', '◝', '◞', '◟'];
+            let frameIndex = 0;
+            const animationInterval = setInterval(() => {
+                bot.editMessageText(
+                    `*Processing your images* ${frames[frameIndex]}`,
+                    {
+                        chat_id: chatId,
+                        message_id: processingMsg.message_id,
+                        parse_mode: 'Markdown'
+                    }
+                ).catch(() => {}); // Ignore errors if message was deleted
+                frameIndex = (frameIndex + 1) % frames.length;
+            }, 500);
 
             // Add job to queue
             upscaleQueue.addJob(chatId, async () => {
@@ -162,11 +180,15 @@ export async function addToUpscaleQueue(bot, chatId, userId, photo) {
                     // Check remaining jobs
                     const remainingJobs = upscaleQueue.getQueueLength(chatId);
                     if (remainingJobs === 0) {
-                        // If no more jobs, delete the status message
+                        // Clear the animation interval
+                        clearInterval(animationInterval);
+                        // Delete the status message
                         await bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
                         pendingUpscaleRequests.delete(chatId);
                     }
                 } catch (error) {
+                    // Clear the animation interval
+                    clearInterval(animationInterval);
                     console.error('Error processing upscale job:', error);
                     await bot.editMessageText(
                         `❌ Error processing image: ${error.message || 'Unknown error'}`,
