@@ -110,7 +110,7 @@ async function processUpscaleJob(bot, chatId, photo) {
 
         // Send the upscaled image
         await bot.sendPhoto(chatId, compressedBuffer, {
-            caption: `✨ Enhanced ${metadata.width}x${metadata.height} ➡️ ${newMetadata.width}x${newMetadata.height}\nUsing Real-ESRGAN with face enhancement`
+            caption: `✨ Enhanced ${metadata.width}x${metadata.height} >> ${newMetadata.width}x${newMetadata.height}\nUsing Real-ESRGAN with face enhancement`
         });
 
     } catch (error) {
@@ -152,47 +152,29 @@ export async function addToUpscaleQueue(bot, chatId, userId, photo) {
         const totalProcessing = upscaleQueue.getTotalProcessingCount();
         const queueLength = upscaleQueue.getTotalQueueLength();
 
-        // Prepare status message
-        let statusMessage;
-        if (totalProcessing < 2 && userProcessing === 0 && queueLength === 0) {
-            statusMessage = '🔄 Starting image enhancement...';
-        } else {
-            statusMessage = `🔄 Image ${userProcessing > 0 ? 'processing' : 'queued for processing'}\n` +
-                          `📊 Position in queue: ${queuePosition}\n` +
-                          `⚡ Your processing slots: ${userProcessing}/2\n` +
-                          `💫 Total processing: ${totalProcessing}/2 slots\n` +
-                          `📝 Total images in queue: ${queueLength}`;
-        }
+        // Send a single status message
+        const statusMessage = `🔄 Processing Queue Status:\n` +
+                            `📊 Position in queue: ${queuePosition}\n` +
+                            `⚡ Your processing slots: ${userProcessing}/2\n` +
+                            `💫 Total processing: ${totalProcessing}/2 slots`;
 
         const processingMsg = await bot.sendMessage(chatId, statusMessage, { parse_mode: 'Markdown' });
 
         // Add job to queue
         upscaleQueue.addJob(chatId, async () => {
             try {
-                // Update message to show processing status
-                await bot.editMessageText(
-                    '🔄 Processing your image...',
-                    {
-                        chat_id: chatId,
-                        message_id: processingMsg.message_id,
-                        parse_mode: 'Markdown'
-                    }
-                ).catch(() => {});
-
-                // Process the image
+                // Process the image without sending additional status messages
                 await processUpscaleJob(bot, chatId, photo);
 
                 // Delete the status message
                 await bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
 
-                // If there are more items in queue, show updated status
+                // Only show remaining queue status if there are more items
                 const remainingJobs = upscaleQueue.getQueueLength(chatId);
                 if (remainingJobs > 0) {
                     await bot.sendMessage(
                         chatId,
-                        `✅ Image processed!\n` +
-                        `📊 ${remainingJobs} more image${remainingJobs > 1 ? 's' : ''} in queue\n` +
-                        `⚡ Currently processing: ${upscaleQueue.getProcessingCount(chatId)}/2 of your slots`,
+                        `📊 ${remainingJobs} more image${remainingJobs > 1 ? 's' : ''} in queue`,
                         { parse_mode: 'Markdown' }
                     );
                 }
