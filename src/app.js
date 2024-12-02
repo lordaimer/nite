@@ -85,23 +85,68 @@ const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
 function setupBotConnection() {
     let reconnectAttempts = 0;
     const maxReconnectAttempts = 10;
+    let lastError = Date.now();
+    const errorThreshold = 5000; // 5 seconds
 
+    // Handle polling errors
     bot.on('polling_error', (error) => {
-        if (reconnectAttempts < maxReconnectAttempts) {
+        console.error('Polling error:', error);
+        const now = Date.now();
+        
+        // If errors are too frequent, increment reconnect attempts
+        if (now - lastError < errorThreshold) {
             reconnectAttempts++;
-            setTimeout(() => {
-                bot.stopPolling().then(() => bot.startPolling());
-            }, 5000 * Math.pow(2, reconnectAttempts));
         } else {
+            reconnectAttempts = 1;
+        }
+        lastError = now;
+
+        if (reconnectAttempts < maxReconnectAttempts) {
+            const delay = 5000 * Math.pow(2, reconnectAttempts);
+            console.log(`Attempting to reconnect in ${delay/1000} seconds...`);
+            setTimeout(() => {
+                bot.stopPolling()
+                    .then(() => bot.startPolling({ restart: true }))
+                    .catch(err => console.error('Error during reconnect:', err));
+            }, delay);
+        } else {
+            console.error('Max reconnection attempts reached, restarting process...');
             process.exit(1); // Let process manager restart the bot
         }
     });
 
+    // Handle webhook errors
     bot.on('webhook_error', (error) => {
+        console.error('Webhook error:', error);
     });
+
+    // Handle errors in message processing
+    bot.on('error', (error) => {
+        console.error('Bot error:', error);
+    });
+
+    // Monitor bot health
+    setInterval(() => {
+        if (!bot.isPolling()) {
+            console.error('Bot polling stopped, attempting to restart...');
+            bot.startPolling({ restart: true })
+                .catch(err => console.error('Error restarting polling:', err));
+        }
+    }, 30000); // Check every 30 seconds
 }
 
 setupBotConnection();
+
+// Add global error handlers
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    // Give time for logs to be written
+    setTimeout(() => process.exit(1), 1000);
+});
 
 // Setup admin commands first (these don't need rate limiting)
 setupAdminCommands(bot);
@@ -296,14 +341,6 @@ bot.on('callback_query', async (query) => {
             return bot.answerCallbackQuery(query.id, "⛔ This action is only available for administrators.");
         }
     }
-});
-
-process.on('uncaughtException', (error) => {
-    process.exit(1);
-});
-
-process.on('unhandledRejection', (error) => {
-    process.exit(1);
 });
 
 // Add to bot.js

@@ -9,12 +9,22 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 // Track active upscale sessions
 const activeUpscaleSessions = new Map(); // chatId -> timestamp
 const pendingUpscaleRequests = new Map(); // chatId -> boolean
-
-// Track media groups being processed
 const mediaGroupsInProgress = new Set();
 
 // Session timeout (5 minutes)
 const SESSION_TIMEOUT = 5 * 60 * 1000;
+
+// Track command execution status
+const commandStatus = new Map(); // chatId -> { lastCommand: timestamp, errors: number }
+
+// Reset error count every hour
+setInterval(() => {
+    for (const [chatId, status] of commandStatus.entries()) {
+        if (Date.now() - status.lastCommand > 60 * 60 * 1000) {
+            commandStatus.delete(chatId);
+        }
+    }
+}, 60 * 60 * 1000);
 
 async function preprocessImage(inputBuffer) {
     // Convert to PNG and ensure reasonable size for processing
@@ -215,89 +225,147 @@ export function setupUpscaleCommand(bot) {
         const chatId = msg.chat.id;
         const userId = msg.from.id;
 
-        // If it's just /upscale without reply, show help message and mark as pending
-        if (msg.text === '/upscale' && !msg.reply_to_message) {
-            pendingUpscaleRequests.set(chatId, true);
-            await bot.sendMessage(
-                chatId,
-                '📸 Send me an image to upscale, or you can:\n\n1. Reply to an image with /upscale\n2. Send an image with /upscale as caption\n3. Send multiple images with /upscale as caption to batch process them',
-                { parse_mode: 'Markdown' }
-            );
-            return;
-        }
-        
-        // Handle single photo in message or reply
-        if (msg.photo || (msg.reply_to_message && msg.reply_to_message.photo)) {
-            const photo = msg.photo || msg.reply_to_message.photo;
-            pendingUpscaleRequests.delete(chatId);
-            
-            if (!isSessionActive(chatId)) {
-                startSession(chatId);
+        try {
+            // Track command execution
+            const status = commandStatus.get(chatId) || { lastCommand: Date.now(), errors: 0 };
+            status.lastCommand = Date.now();
+            commandStatus.set(chatId, status);
+
+            // If too many errors, suggest waiting
+            if (status.errors >= 3) {
+                const waitTime = Math.min(5 * Math.pow(2, status.errors - 3), 30);
+                await bot.sendMessage(
+                    chatId,
+                    `⚠️ Several errors detected. Please wait ${waitTime} minutes before trying again.`,
+                    { parse_mode: 'Markdown' }
+                );
+                return;
+            }
+
+            // If it's just /upscale without reply, show help message and mark as pending
+            if (msg.text === '/upscale' && !msg.reply_to_message) {
+                pendingUpscaleRequests.set(chatId, true);
+                await bot.sendMessage(
+                    chatId,
+                    '📸 Send me an image to upscale, or you can:\n\n1. Reply to an image with /upscale\n2. Send an image with /upscale as caption\n3. Send multiple images with /upscale as caption to batch process them',
+                    { parse_mode: 'Markdown' }
+                );
+                return;
             }
             
-            await addToUpscaleQueue(bot, chatId, userId, photo);
+            // Handle single photo in message or reply
+            if (msg.photo || (msg.reply_to_message && msg.reply_to_message.photo)) {
+                const photo = msg.photo || msg.reply_to_message.photo;
+                pendingUpscaleRequests.delete(chatId);
+                
+                if (!isSessionActive(chatId)) {
+                    startSession(chatId);
+                }
+                
+                await addToUpscaleQueue(bot, chatId, userId, photo);
+            }
+        } catch (error) {
+            console.error('Error in upscale command:', error);
+            
+            // Update error count
+            const status = commandStatus.get(chatId);
+            if (status) {
+                status.errors++;
+                commandStatus.set(chatId, status);
+            }
+
+            // Clean up session state
+            pendingUpscaleRequests.delete(chatId);
+            mediaGroupsInProgress.delete(msg.media_group_id);
+            
+            await bot.sendMessage(
+                chatId,
+                '❌ An error occurred while processing your request. Please try again in a few minutes.',
+                { parse_mode: 'Markdown' }
+            );
         }
     });
 
-    // Handle photos sent during active session or pending request
+    // Handle photos with enhanced error handling
     bot.on('photo', async (msg) => {
         const chatId = msg.chat.id;
         const userId = msg.from.id;
         const mediaGroupId = msg.media_group_id;
 
-        // If part of a media group and has /upscale caption
-        if (mediaGroupId && msg.caption && msg.caption.includes('/upscale')) {
-            // Skip if we're already processing this media group
-            if (mediaGroupsInProgress.has(mediaGroupId)) {
+        try {
+            // If part of a media group and has /upscale caption
+            if (mediaGroupId && msg.caption && msg.caption.includes('/upscale')) {
+                // Skip if we're already processing this media group
+                if (mediaGroupsInProgress.has(mediaGroupId)) {
+                    return;
+                }
+
+                // Mark this media group as being processed
+                mediaGroupsInProgress.add(mediaGroupId);
+                
+                // Start session
+                if (!isSessionActive(chatId)) {
+                    startSession(chatId);
+                }
+
+                // Queue this photo
+                await addToUpscaleQueue(bot, chatId, userId, msg.photo);
+
+                // Send confirmation for first photo
+                await bot.sendMessage(
+                    chatId,
+                    '✅ Processing media group... Send all your images!',
+                    { parse_mode: 'Markdown' }
+                );
+
+                // Clean up after 5 seconds
+                setTimeout(() => {
+                    mediaGroupsInProgress.delete(mediaGroupId);
+                }, 5000);
+                
                 return;
             }
 
-            // Mark this media group as being processed
-            mediaGroupsInProgress.add(mediaGroupId);
-            
-            // Start session
-            if (!isSessionActive(chatId)) {
-                startSession(chatId);
+            // If part of a media group during active session
+            if (mediaGroupId && isSessionActive(chatId)) {
+                // Queue this photo
+                await addToUpscaleQueue(bot, chatId, userId, msg.photo);
+                return;
             }
 
-            // Queue this photo
-            await addToUpscaleQueue(bot, chatId, userId, msg.photo);
+            // Handle single photo with pending request
+            if (pendingUpscaleRequests.has(chatId)) {
+                pendingUpscaleRequests.delete(chatId);
+                if (!isSessionActive(chatId)) {
+                    startSession(chatId);
+                }
+                await addToUpscaleQueue(bot, chatId, userId, msg.photo);
+                return;
+            }
 
-            // Send confirmation for first photo
+            // Handle single photo during active session
+            if (isSessionActive(chatId)) {
+                await addToUpscaleQueue(bot, chatId, userId, msg.photo);
+            }
+        } catch (error) {
+            console.error('Error handling photo:', error);
+            
+            // Update error count
+            const status = commandStatus.get(chatId) || { lastCommand: Date.now(), errors: 0 };
+            status.errors++;
+            commandStatus.set(chatId, status);
+
+            // Clean up session state
+            pendingUpscaleRequests.delete(chatId);
+            if (mediaGroupId) {
+                mediaGroupsInProgress.delete(mediaGroupId);
+            }
+            
             await bot.sendMessage(
                 chatId,
-                '✅ Processing media group... Send all your images!',
+                '❌ An error occurred while processing your photo. Please try again in a few minutes.',
                 { parse_mode: 'Markdown' }
-            );
-
-            // Clean up after 5 seconds
-            setTimeout(() => {
-                mediaGroupsInProgress.delete(mediaGroupId);
-            }, 5000);
-            
-            return;
-        }
-
-        // If part of a media group during active session
-        if (mediaGroupId && isSessionActive(chatId)) {
-            // Queue this photo
-            await addToUpscaleQueue(bot, chatId, userId, msg.photo);
-            return;
-        }
-
-        // Handle single photo with pending request
-        if (pendingUpscaleRequests.has(chatId)) {
-            pendingUpscaleRequests.delete(chatId);
-            if (!isSessionActive(chatId)) {
-                startSession(chatId);
-            }
-            await addToUpscaleQueue(bot, chatId, userId, msg.photo);
-            return;
-        }
-
-        // Handle single photo during active session
-        if (isSessionActive(chatId)) {
-            await addToUpscaleQueue(bot, chatId, userId, msg.photo);
+            ).catch(err => console.error('Error sending error message:', err));
         }
     });
 

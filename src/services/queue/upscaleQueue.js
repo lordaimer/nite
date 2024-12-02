@@ -4,69 +4,95 @@ class UpscaleQueue {
         this.processing = new Map(); // Map of chatId -> number of jobs processing
         this.MAX_CONCURRENT_JOBS = 2; // Maximum number of parallel processes
         this.MAX_PER_USER = 2; // Maximum concurrent jobs per user
+        this.isProcessing = false; // Flag to track if queue is being processed
     }
 
     // Add a job to the queue
     addJob(chatId, job) {
         this.globalQueue.push({ chatId, job });
-        this.processQueue();
+        // Start processing if not already processing
+        if (!this.isProcessing) {
+            this.processQueue();
+        }
     }
 
     // Process the next jobs in the queue
     async processQueue() {
+        // If already processing, return
+        if (this.isProcessing) {
+            return;
+        }
+
         try {
-            // If we're at max capacity, return
-            const totalProcessing = Array.from(this.processing.values()).reduce((a, b) => a + b, 0);
-            if (totalProcessing >= this.MAX_CONCURRENT_JOBS) {
-                return;
-            }
+            this.isProcessing = true;
 
-            // Safety check for invalid processing states
-            for (const [chatId, count] of this.processing.entries()) {
-                if (typeof count !== 'number' || count <= 0) {
-                    this.processing.delete(chatId);
-                }
-            }
-
-            // Process as many jobs as we can up to MAX_CONCURRENT_JOBS
-            let processedInThisRound = 0;
-            while (processedInThisRound < this.MAX_CONCURRENT_JOBS && this.globalQueue.length > 0) {
-                const nextJob = this.globalQueue[0];
-                
-                // Validate job object
-                if (!nextJob || !nextJob.chatId || typeof nextJob.job !== 'function') {
-                    console.error('Invalid job in queue:', nextJob);
-                    this.globalQueue.shift(); // Remove invalid job
-                    continue;
+            while (true) { // Continue processing until no more jobs can be processed
+                // Get total processing count
+                const totalProcessing = Array.from(this.processing.values()).reduce((a, b) => a + b, 0);
+                if (totalProcessing >= this.MAX_CONCURRENT_JOBS || this.globalQueue.length === 0) {
+                    break; // Exit if at capacity or no more jobs
                 }
 
-                const userProcessing = this.processing.get(nextJob.chatId) || 0;
-                
-                // Skip if this user is at their max concurrent jobs
-                if (userProcessing >= this.MAX_PER_USER) {
-                    // Check next job
-                    if (this.globalQueue.length > 1) {
-                        // Move this job to the end and try the next one
-                        this.globalQueue.push(this.globalQueue.shift());
+                // Safety check for invalid processing states
+                for (const [chatId, count] of this.processing.entries()) {
+                    if (typeof count !== 'number' || count <= 0) {
+                        this.processing.delete(chatId);
+                    }
+                }
+
+                let jobProcessed = false;
+                for (let i = 0; i < this.globalQueue.length; i++) {
+                    const nextJob = this.globalQueue[i];
+                    
+                    // Validate job object
+                    if (!nextJob || !nextJob.chatId || typeof nextJob.job !== 'function') {
+                        console.error('Invalid job in queue:', nextJob);
+                        this.globalQueue.splice(i, 1); // Remove invalid job
+                        i--; // Adjust index
                         continue;
                     }
-                    break;
+
+                    const userProcessing = this.processing.get(nextJob.chatId) || 0;
+                    
+                    // Skip if this user is at their max concurrent jobs
+                    if (userProcessing >= this.MAX_PER_USER) {
+                        continue;
+                    }
+
+                    // Remove the job from queue
+                    this.globalQueue.splice(i, 1);
+                    
+                    // Increment processing count for this user
+                    this.processing.set(nextJob.chatId, userProcessing + 1);
+                    jobProcessed = true;
+
+                    // Process the job asynchronously
+                    this.processJob(nextJob.chatId, nextJob.job)
+                        .catch(error => {
+                            console.error(`Job processing failed for chat ${nextJob.chatId}:`, error);
+                        })
+                        .finally(() => {
+                            // Try to process more jobs when this one finishes
+                            this.processQueue();
+                        });
+                    
+                    break; // Process one job at a time
                 }
 
-                // Remove the job from queue
-                this.globalQueue.shift();
-                
-                // Increment processing count for this user
-                this.processing.set(nextJob.chatId, userProcessing + 1);
-                processedInThisRound++;
-
-                // Process the job asynchronously
-                this.processJob(nextJob.chatId, nextJob.job).catch(error => {
-                    console.error(`Job processing failed for chat ${nextJob.chatId}:`, error);
-                });
+                if (!jobProcessed) {
+                    break; // No jobs could be processed in this iteration
+                }
             }
         } catch (error) {
             console.error('Error in processQueue:', error);
+        } finally {
+            this.isProcessing = false;
+            
+            // If there are still jobs and capacity, process them
+            const totalProcessing = Array.from(this.processing.values()).reduce((a, b) => a + b, 0);
+            if (this.globalQueue.length > 0 && totalProcessing < this.MAX_CONCURRENT_JOBS) {
+                setImmediate(() => this.processQueue());
+            }
         }
     }
 
