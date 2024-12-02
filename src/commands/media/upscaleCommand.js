@@ -110,7 +110,8 @@ async function processUpscaleJob(bot, chatId, photo) {
 
         // Send the upscaled image
         await bot.sendPhoto(chatId, compressedBuffer, {
-            caption: `✨ Enhanced ${metadata.width}x${metadata.height} >> ${newMetadata.width}x${newMetadata.height}`
+            caption: `*✨ Enhanced ${metadata.width}x${metadata.height} >> ${newMetadata.width}x${newMetadata.height}*`,
+            parse_mode: 'Markdown'
         });
 
     } catch (error) {
@@ -230,10 +231,11 @@ export async function addToUpscaleQueue(bot, chatId, userId, photo) {
 }
 
 export function setupUpscaleCommand(bot) {
-    // Handle /upscale command with image or reply
-    bot.onText(/\/upscale/, async (msg) => {
+    // Handle /upscale and /upsc commands with image or reply
+    bot.onText(/\/(upscale|upsc)/, async (msg) => {
         const chatId = msg.chat.id;
         const userId = msg.from.id;
+        const command = msg.text.split(' ')[0]; // Get the actual command used
 
         try {
             // Track command execution
@@ -252,12 +254,12 @@ export function setupUpscaleCommand(bot) {
                 return;
             }
 
-            // If it's just /upscale without reply, show help message and mark as pending
-            if (msg.text === '/upscale' && !msg.reply_to_message) {
+            // If it's just the command without reply, show help message and mark as pending
+            if ((msg.text === '/upscale' || msg.text === '/upsc') && !msg.reply_to_message) {
                 pendingUpscaleRequests.set(chatId, true);
                 await bot.sendMessage(
                     chatId,
-                    '📸 Send me an image to upscale, or you can:\n\n1. Reply to an image with /upscale\n2. Send an image with /upscale as caption\n3. Send multiple images with /upscale as caption to batch process them',
+                    '📸 Send me an image to upscale, or you can:\n\n1. Reply to an image with /upscale or /upsc\n2. Send an image with /upscale or /upsc as caption\n3. Send multiple images with /upscale or /upsc as caption to batch process them',
                     { parse_mode: 'Markdown' }
                 );
                 return;
@@ -382,7 +384,7 @@ export function setupUpscaleCommand(bot) {
     // Clear pending requests when user sends other commands
     bot.on('text', (msg) => {
         const chatId = msg.chat.id;
-        if (msg.text.startsWith('/') && msg.text !== '/upscale') {
+        if (msg.text.startsWith('/') && msg.text !== '/upscale' && msg.text !== '/upsc') {
             pendingUpscaleRequests.delete(chatId);
         }
     });
