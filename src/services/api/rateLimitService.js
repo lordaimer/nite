@@ -7,6 +7,11 @@ class RateLimitService {
     }
 
     check(userId, action, maxRequests, timeWindow) {
+        // Admin bypass - always allow admin user
+        if (userId.toString() === process.env.ADMIN_USER_ID) {
+            return true;
+        }
+
         const key = `${userId}:${action}`;
         const now = Date.now();
         const userRequests = this.userLimits.get(key) || [];
@@ -24,7 +29,12 @@ class RateLimitService {
         return true;
     }
 
-    checkGlobal(action, maxRequests, timeWindow) {
+    checkGlobal(action, maxRequests, timeWindow, userId = null) {
+        // Admin bypass - always allow admin user
+        if (userId && userId.toString() === process.env.ADMIN_USER_ID) {
+            return true;
+        }
+
         const now = Date.now();
         const globalRequests = this.globalLimits.get(action) || [];
 

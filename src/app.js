@@ -181,7 +181,7 @@ bot.on('message', async (msg) => {
     }
 
     // Global rate limit check
-    if (!rateLimitService.checkGlobal('message', 60, 60000)) { // 60 messages per minute globally
+    if (!rateLimitService.checkGlobal('message', 60, 60000, userId)) { // 60 messages per minute globally
         await bot.sendMessage(
             chatId,
             '⚠️ Bot is experiencing high traffic. Please try again in a moment.',
