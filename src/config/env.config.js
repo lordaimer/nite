@@ -14,6 +14,8 @@ export function validateEnvironment() {
         'HUGGING_FACE_TOKEN_2',
         'HUGGING_FACE_TOKEN_3',
         'HUGGING_FACE_TOKEN_4',
+        'HUGGING_FACE_TOKEN_5',
+        'HUGGING_FACE_TOKEN_6',
         'ELEVENLABS_API_KEY',
         'OMDB_API_KEY',
         'TMDB_API_KEY',
@@ -56,7 +58,9 @@ export const config = {
             process.env.HUGGING_FACE_TOKEN_1,
             process.env.HUGGING_FACE_TOKEN_2,
             process.env.HUGGING_FACE_TOKEN_3,
-            process.env.HUGGING_FACE_TOKEN_4
+            process.env.HUGGING_FACE_TOKEN_4,
+            process.env.HUGGING_FACE_TOKEN_5,
+            process.env.HUGGING_FACE_TOKEN_6
         ]
     },
     elevenlabs: {

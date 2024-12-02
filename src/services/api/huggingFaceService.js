@@ -1,94 +1,159 @@
 import { HfInference } from '@huggingface/inference';
 import { config } from '../../config/env.config.js';
 
+const MODEL_TOKEN_MAP = {
+    'black-forest-labs/FLUX.1-dev': 0,        // FLUX Dev - Token 1
+    'black-forest-labs/FLUX.1-schnell': 1,    // FLUX Schnell - Token 2
+    'XLabs-AI/flux-RealismLora': 2,          // FLUX Realism - Token 3
+    'Shakker-Labs/FLUX.1-dev-LoRA-Logo-Design': 3, // FLUX Logo - Token 4
+    'alvdansen/flux-koda': 4,                 // FLUX Koda - Token 5
+    'alvdansen/softserve_anime': 5            // Anime Style - Token 6
+};
+
 class HuggingFaceService {
     constructor() {
         this.tokens = config.huggingface.tokens;
-        this.currentIndex = 0;
         this.clients = this.tokens.map(token => new HfInference(token));
-        this.lastUsed = new Map(); // Track last usage time for each token
-        this.requestCounts = new Map(); // Track request count for each token
-        this.resetTime = 60000; // 1 minute in milliseconds
-        this.maxRequestsPerMinute = 3;
+        this.activeGenerations = new Map(); // Track active generations per token
+        this.maxRetries = 2;
+        this.currentTokenIndex = 0; // Add this for token rotation
+        this.GLOBAL_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
     }
 
-    getNextClient() {
-        const now = Date.now();
-        let attempts = 0;
-        const maxAttempts = this.clients.length;
+    getNextToken() {
+        // Get current token and client
+        const currentIndex = this.currentTokenIndex;
+        const token = this.tokens[currentIndex];
+        const client = this.clients[currentIndex];
+        
+        // Increment for next use
+        this.currentTokenIndex = (this.currentTokenIndex + 1) % this.tokens.length;
+        
+        return {
+            client: client,
+            token: token,
+            index: currentIndex
+        };
+    }
 
-        while (attempts < maxAttempts) {
-            const client = this.clients[this.currentIndex];
-            const token = this.tokens[this.currentIndex];
-            const lastUsedTime = this.lastUsed.get(token) || 0;
-            const requestCount = this.requestCounts.get(token) || 0;
-
-            // Reset counter if minute has passed
-            if (now - lastUsedTime > this.resetTime) {
-                this.requestCounts.set(token, 0);
-                this.lastUsed.set(token, now);
-                return client;
-            }
-
-            // Use this client if under rate limit
-            if (requestCount < this.maxRequestsPerMinute) {
-                this.requestCounts.set(token, requestCount + 1);
-                this.lastUsed.set(token, now);
-                return client;
-            }
-
-            // Move to next client
-            this.currentIndex = (this.currentIndex + 1) % this.clients.length;
-            attempts++;
+    getClientForModel(model, forceRotate = false) {
+        if (forceRotate) {
+            return this.getNextToken();
         }
-
-        // If all clients are at rate limit, use the oldest one
-        let oldestTime = Infinity;
-        let oldestIndex = 0;
-
-        this.lastUsed.forEach((time, token, index) => {
-            if (time < oldestTime) {
-                oldestTime = time;
-                oldestIndex = this.tokens.indexOf(token);
-            }
-        });
-
-        this.currentIndex = oldestIndex;
-        const token = this.tokens[this.currentIndex];
-        this.requestCounts.set(token, 1);
-        this.lastUsed.set(token, now);
-        return this.clients[this.currentIndex];
+        const tokenIndex = MODEL_TOKEN_MAP[model];
+        return {
+            client: this.clients[tokenIndex],
+            token: this.tokens[tokenIndex],
+            index: tokenIndex
+        };
     }
 
-    async generateImage(prompt, model) {
-        const client = this.getNextClient();
+    async generateImageWithRetry(client, token, prompt, model, retryCount = 0) {
+        console.log(`🎨 Starting generation for ${model} using token ${this.tokens.indexOf(token) + 1}`);
+        
         try {
+            this.activeGenerations.set(token, true);
             const result = await client.textToImage({
                 inputs: prompt,
                 model: model
             });
+            console.log(`✅ Successfully generated image for ${model}`);
             return result;
         } catch (error) {
-            console.error(`Error generating image with token ${this.currentIndex + 1}:`, error);
+            if (retryCount < this.maxRetries) {
+                console.log(`⚠️ Retry ${retryCount + 1} for ${model}: ${error.message}`);
+                return this.generateImageWithRetry(client, token, prompt, model, retryCount + 1);
+            }
+            console.error(`❌ Failed to generate image for ${model} after ${retryCount} retries: ${error.message}`);
+            throw error;
+        } finally {
+            this.activeGenerations.set(token, false);
+        }
+    }
+
+    async generateImage(prompt, model, forceRotate = false) {
+        const { client, token, index } = this.getClientForModel(model, forceRotate);
+        try {
+            const result = await this.generateImageWithRetry(client, token, prompt, model);
+            return result;
+        } catch (error) {
+            console.error(`❌ Error generating image with token ${index + 1}:`, error.message);
             throw error;
         }
+    }
+
+    async generateMultipleImages(prompt, model, count) {
+        console.log(`🎨 Starting multiple generation (${count} images) for ${model}`);
+        const results = [];
+        const errors = [];
+
+        const generateWithTimeout = async () => {
+            const promises = Array(count).fill().map((_, index) => {
+                return this.generateImage(prompt, model, true)
+                    .then(result => {
+                        console.log(`✅ Generated image ${index + 1}/${count} for ${model}`);
+                        results.push(result);
+                    })
+                    .catch(error => {
+                        console.error(`❌ Failed to generate image ${index + 1}/${count} for ${model}:`, error.message);
+                        errors.push(error);
+                    });
+            });
+
+            // Global timeout promise
+            const timeoutPromise = new Promise(resolve => 
+                setTimeout(resolve, this.GLOBAL_TIMEOUT)
+            );
+
+            // Race between all generations and timeout
+            await Promise.race([
+                Promise.all(promises),
+                timeoutPromise
+            ]);
+
+            console.log(`🏁 Multiple generation completed. Success: ${results.length}, Failures: ${errors.length}`);
+
+            // Return whatever images we have, even if incomplete
+            return results;
+        };
+
+        const generatedImages = await generateWithTimeout();
+        
+        if (generatedImages.length === 0) {
+            throw new Error('Failed to generate any images within the time limit. Please try again.');
+        }
+
+        return generatedImages;
     }
 
     async batchGenerateImages(prompt, models) {
         const results = [];
         const errors = [];
+        console.log(`🚀 Starting batch generation for ${models.length} models`);
 
-        // Generate images in parallel
+        // Generate images in parallel, each model using its dedicated token
         const promises = models.map(async (model) => {
             try {
                 const result = await this.generateImage(prompt, model);
+                const modelName = Object.entries(MODEL_TOKEN_MAP).find(([key, value]) => key === model)[0];
+                console.log(`✨ Added ${modelName} result to batch`);
                 results.push({ model, image: result });
             } catch (error) {
+                const modelName = Object.entries(MODEL_TOKEN_MAP).find(([key, value]) => key === model)[0];
+                console.error(`❌ Failed to generate image for ${modelName}:`, error.message);
                 errors.push({ model, error: error.message });
             }
         });
 
         await Promise.all(promises);
+        console.log(`🏁 Batch generation completed. Success: ${results.length}, Failures: ${errors.length}`);
+        
+        // If all models failed, throw an error
+        if (results.length === 0 && errors.length === models.length) {
+            console.error('❌ All models failed to generate images');
+            throw new Error('All models failed to generate images. Please try again.');
+        }
+
         return { results, errors };
     }
 }

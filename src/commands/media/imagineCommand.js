@@ -270,8 +270,7 @@ export function setupImageCommand(bot, rateLimit) {
             try {
                 // Generate multiple images from the same model
                 const numImages = 5;
-                const imagePromises = Array(numImages).fill().map(() => generateImage(modelId, prompt));
-                const responses = await Promise.all(imagePromises);
+                const responses = await huggingFaceService.generateMultipleImages(prompt, modelId, numImages);
 
                 // Send all generated images
                 for (const response of responses) {
