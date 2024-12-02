@@ -144,3 +144,7 @@ src/data/botState.json
 src/data/bugs.json
 src/data/*.db 
 dbquery.js
+
+# Voice Service Configuration
+
+src/services/voice-service/*
