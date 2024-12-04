@@ -7,7 +7,7 @@ export function setupKeyCommand(bot) {
     bot.onText(/\/key$/, async (msg) => {
         const chatId = msg.chat.id;
         if (msg.from.id.toString() !== config.telegram.adminId) {
-            await bot.sendMessage(chatId, '⚠️ This command is only available to administrators.');
+            await bot.sendMessage(chatId, 'This command is only available to administrators.');
             return;
         }
         
@@ -26,7 +26,7 @@ export function setupKeyCommand(bot) {
         
         // Check if user is admin
         if (userId !== config.telegram.adminId) {
-            await bot.sendMessage(chatId, '⚠️ This command is only available to administrators.');
+            await bot.sendMessage(chatId, 'This command is only available to administrators.');
             return;
         }
 
@@ -35,7 +35,7 @@ export function setupKeyCommand(bot) {
         try {
             // Validate token by making a test API call
             const hf = new HfInference(token);
-            await bot.sendMessage(chatId, '🔄 Validating token...');
+            await bot.sendMessage(chatId, 'Validating token...');
             
             try {
                 // Test with a quick image generation
@@ -46,9 +46,9 @@ export function setupKeyCommand(bot) {
             } catch (error) {
                 console.error('Token validation error:', error.message);
                 if (error.message.includes('Rate limit')) {
-                    await bot.sendMessage(chatId, '✅ Token is valid! (Rate limit hit, but token works)');
+                    await bot.sendMessage(chatId, 'Token is valid! (Rate limit hit, but token works)');
                 } else {
-                    await bot.sendMessage(chatId, '❌ Invalid token. Please check your token and try again.');
+                    await bot.sendMessage(chatId, 'Invalid token. Please check your token and try again.');
                     return;
                 }
             }
@@ -84,7 +84,7 @@ export function setupKeyCommand(bot) {
             
             await bot.sendMessage(
                 chatId,
-                `✅ Successfully added new HuggingFace token ${newTokenNumber}.\n` +
+                `Successfully added new HuggingFace token ${newTokenNumber}.\n` +
                 'Please restart the bot for the changes to take effect.',
                 { parse_mode: 'Markdown' }
             );
@@ -93,7 +93,7 @@ export function setupKeyCommand(bot) {
             console.error('Error adding token:', error);
             await bot.sendMessage(
                 chatId,
-                '❌ An error occurred while adding the token. Please try again later.'
+                'An error occurred while adding the token. Please try again later.'
             );
         }
     });
