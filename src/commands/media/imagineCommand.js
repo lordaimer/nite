@@ -187,13 +187,7 @@ export function setupImageCommand(bot, rateLimit) {
                     reply_to_message_id: session.originalMessageId
                 });
 
-                await bot.editMessageText(
-                    '✨ Generated images using all available models!',
-                    {
-                        chat_id: chatId,
-                        message_id: messageId
-                    }
-                );
+                await bot.deleteMessage(chatId, messageId);
             } catch (error) {
                 console.error('Error in variety generation:', error);
                 await bot.editMessageText(
@@ -251,13 +245,7 @@ export function setupImageCommand(bot, rateLimit) {
                     reply_to_message_id: session.originalMessageId
                 });
 
-                await bot.editMessageText(
-                    '✨ Generated images successfully!',
-                    {
-                        chat_id: chatId,
-                        message_id: messageId
-                    }
-                );
+                await bot.deleteMessage(chatId, messageId);
             } catch (error) {
                 console.error('Error in image generation:', error);
                 await bot.editMessageText(
