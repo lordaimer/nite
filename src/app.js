@@ -38,6 +38,7 @@ app.listen(PORT, '0.0.0.0', async () => {
 
 import {
     setupAdminCommands,
+    setupKeyCommand,
     setupMemeCommand,
     setupImageCommand,
     setupMovieCommand,
@@ -150,6 +151,7 @@ process.on('uncaughtException', (error) => {
 
 // Setup admin commands first (these don't need rate limiting)
 setupAdminCommands(bot);
+setupKeyCommand(bot);
 
 // Setup access control middleware
 setupAccessControl(bot);

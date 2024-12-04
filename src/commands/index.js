@@ -1,5 +1,6 @@
 // Admin Commands
 export { setupAdminCommands } from './admin/adminCommands.js';
+export { setupKeyCommand } from './admin/keyCommand.js';
 
 // Media Commands
 export { setupMemeCommand, getMemeResponse } from './media/memeCommand.js';

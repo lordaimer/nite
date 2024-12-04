@@ -11,11 +11,6 @@ export function validateEnvironment() {
         'UNSPLASH_ACCESS_KEY',
         'PIXABAY_API_KEY',
         'HUGGING_FACE_TOKEN_1',
-        'HUGGING_FACE_TOKEN_2',
-        'HUGGING_FACE_TOKEN_3',
-        'HUGGING_FACE_TOKEN_4',
-        'HUGGING_FACE_TOKEN_5',
-        'HUGGING_FACE_TOKEN_6',
         'ELEVENLABS_API_KEY',
         'OMDB_API_KEY',
         'TMDB_API_KEY',
@@ -54,14 +49,14 @@ export const config = {
         apiKey: process.env.PIXABAY_API_KEY
     },
     huggingface: {
-        tokens: [
-            process.env.HUGGING_FACE_TOKEN_1,
-            process.env.HUGGING_FACE_TOKEN_2,
-            process.env.HUGGING_FACE_TOKEN_3,
-            process.env.HUGGING_FACE_TOKEN_4,
-            process.env.HUGGING_FACE_TOKEN_5,
-            process.env.HUGGING_FACE_TOKEN_6
-        ]
+        tokens: Object.keys(process.env)
+            .filter(key => key.startsWith('HUGGING_FACE_TOKEN_'))
+            .sort((a, b) => {
+                const numA = parseInt(a.split('_').pop());
+                const numB = parseInt(b.split('_').pop());
+                return numA - numB;
+            })
+            .map(key => process.env[key])
     },
     elevenlabs: {
         apiKey: process.env.ELEVENLABS_API_KEY
