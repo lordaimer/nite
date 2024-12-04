@@ -222,6 +222,9 @@ export function setupImageCommand(bot, rateLimit) {
                 return;
             }
 
+            // Answer callback query immediately
+            await bot.answerCallbackQuery(query.id);
+
             await bot.editMessageText(
                 `🎨 Generating images using ${modelName}...`,
                 {
@@ -265,7 +268,6 @@ export function setupImageCommand(bot, rateLimit) {
                     }
                 );
             }
-            await bot.answerCallbackQuery(query.id);
             return;
         }
 
