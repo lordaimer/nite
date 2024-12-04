@@ -126,7 +126,7 @@ export function setupImageCommand(bot, rateLimit) {
         
         await bot.sendMessage(
             chatId,
-            '🎨 Choose generation mode:',
+            'Choose generation mode:',
             { 
                 reply_markup: getModeKeyboard(),
                 reply_to_message_id: msg.message_id
@@ -141,7 +141,7 @@ export function setupImageCommand(bot, rateLimit) {
         // Handle mode selection
         if (query.data === 'mode_select') {
             await bot.editMessageText(
-                '🎨 Choose a model for image generation:',
+                'Choose a model for image generation:',
                 {
                     chat_id: chatId,
                     message_id: messageId,
@@ -163,42 +163,139 @@ export function setupImageCommand(bot, rateLimit) {
                 return;
             }
 
-            await bot.editMessageText(
-                '🎨 Generating variety of images...',
-                {
-                    chat_id: chatId,
-                    message_id: messageId,
-                    reply_markup: { inline_keyboard: [] }
+            // Send initial status message
+            const statusMessageId = (await bot.sendMessage(
+                chatId,
+                '*Generating variety of images* ◡',
+                { parse_mode: 'Markdown' }
+            )).message_id;
+
+            // Delete the model selection message
+            await bot.deleteMessage(chatId, messageId);
+
+            // Setup animation frames with longer interval to avoid rate limits
+            const frames = ['◜', '◝', '◞', '◟'];
+            let frameIndex = 0;
+            let lastUpdateTime = Date.now();
+            const MIN_UPDATE_INTERVAL = 500; // Minimum 2 seconds between updates
+            
+            const animationInterval = setInterval(async () => {
+                const now = Date.now();
+                // Only update if enough time has passed
+                if (now - lastUpdateTime >= MIN_UPDATE_INTERVAL) {
+                    try {
+                        await bot.editMessageText(
+                            `*Generating variety of images* ${frames[frameIndex]}`,
+                            {
+                                chat_id: chatId,
+                                message_id: statusMessageId,
+                                parse_mode: 'Markdown'
+                            }
+                        );
+                        lastUpdateTime = now;
+                        frameIndex = (frameIndex + 1) % frames.length;
+                    } catch (error) {
+                        if (error.code === 'ETELEGRAM' && error.response.statusCode === 429) {
+                            const retryAfter = error.response.body.parameters.retry_after || 30;
+                            console.log(`Rate limited, waiting ${retryAfter} seconds before next update`);
+                            // Skip this update and wait for the next interval
+                        } else {
+                            console.error('Error updating status message:', error);
+                        }
+                    }
                 }
-            );
+            }, 2000); // Check every 2 seconds
 
             try {
-                const results = await generateVariety(session.prompt);
+                // List of all models with their display names
+                const modelMap = {
+                    'black-forest-labs/FLUX.1-dev': 'FLUX Dev',
+                    'black-forest-labs/FLUX.1-schnell': 'FLUX Schnell',
+                    'XLabs-AI/flux-RealismLora': 'FLUX Realism',
+                    'Shakker-Labs/FLUX.1-dev-LoRA-Logo-Design': 'FLUX Logo',
+                    'alvdansen/flux-koda': 'FLUX Koda',
+                    'alvdansen/softserve_anime': 'Anime Style'
+                };
+
+                // Add a unique timestamp to prevent server-side caching
+                const uniquePrompt = `${session.prompt} [t:${Date.now()}]`;
                 
-                // Send all generated images as a media group
-                const mediaGroup = results.map(({ modelName, image }) => ({
-                    type: 'photo',
-                    media: image, // Image is now already a Buffer
-                    caption: `*${modelName}*`,
-                    parse_mode: 'Markdown'
-                }));
-
-                await bot.sendMediaGroup(chatId, mediaGroup, {
-                    reply_to_message_id: session.originalMessageId
-                });
-
-                await bot.deleteMessage(chatId, messageId);
-            } catch (error) {
-                console.error('Error in variety generation:', error);
-                await bot.editMessageText(
-                    '❌ An error occurred while generating images. Please try again.',
-                    {
-                        chat_id: chatId,
-                        message_id: messageId
-                    }
+                // Generate images using all models
+                const { results, errors } = await huggingFaceService.batchGenerateImages(
+                    uniquePrompt,
+                    Object.keys(modelMap)
                 );
+
+                if (results.length > 0) {
+                    // Create media group from successful generations
+                    const mediaGroup = results.map(({ model, image }) => ({
+                        type: 'photo',
+                        media: image,
+                        caption: `*${modelMap[model]}*`,
+                        parse_mode: 'Markdown'
+                    }));
+
+                    // Clear animation before sending images
+                    clearInterval(animationInterval);
+
+                    try {
+                        await bot.sendMediaGroup(chatId, mediaGroup, {
+                            reply_to_message_id: session.originalMessageId
+                        });
+                    } catch (sendError) {
+                        if (sendError.code === 'ETELEGRAM' && sendError.response.statusCode === 429) {
+                            const retryAfter = sendError.response.body.parameters.retry_after || 30;
+                            console.log(`Rate limited when sending images, waiting ${retryAfter} seconds`);
+                            await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+                            // Try sending again after waiting
+                            await bot.sendMediaGroup(chatId, mediaGroup, {
+                                reply_to_message_id: session.originalMessageId
+                            });
+                        } else {
+                            console.error('Error sending media group:', sendError);
+                            try {
+                                await bot.editMessageText(
+                                    '❌ Network error while sending images. Please try again.',
+                                    {
+                                        chat_id: chatId,
+                                        message_id: statusMessageId,
+                                        parse_mode: 'Markdown'
+                                    }
+                                );
+                            } catch (finalError) {
+                                console.error('Could not send error message:', finalError);
+                            }
+                            return;
+                        }
+                    }
+
+                    // Try to delete status message after sending images
+                    try {
+                        await bot.deleteMessage(chatId, statusMessageId);
+                    } catch (deleteError) {
+                        console.error('Error deleting status message:', deleteError);
+                    }
+                } else {
+                    throw new Error('No images were generated successfully');
+                }
+
+            } catch (error) {
+                // Clear animation on error
+                clearInterval(animationInterval);
+                console.error('Error in image generation:', error);
+                try {
+                    await bot.editMessageText(
+                        '❌ An error occurred while generating the images. Please try again.',
+                        {
+                            chat_id: chatId,
+                            message_id: statusMessageId,
+                            parse_mode: 'Markdown'
+                        }
+                    );
+                } catch (editError) {
+                    console.error('Could not edit error message:', editError);
+                }
             }
-            await bot.answerCallbackQuery(query.id);
             return;
         }
 
