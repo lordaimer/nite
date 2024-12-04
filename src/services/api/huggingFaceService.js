@@ -94,7 +94,9 @@ class HuggingFaceService {
 
         const generateWithTimeout = async () => {
             const promises = Array(count).fill().map((_, index) => {
-                return this.generateImage(prompt, model, true)
+                // Add a unique timestamp for each request to prevent server-side caching
+                const uniquePrompt = `${prompt} [t:${Date.now() + index}]`;
+                return this.generateImage(uniquePrompt, model, true)
                     .then(result => {
                         console.log(`✅ Generated image ${index + 1}/${count} for ${model}`);
                         results.push(result);
