@@ -246,7 +246,7 @@ export function setupImageCommand(bot, rateLimit) {
 
             try {
                 // Generate multiple images from the same model
-                const numImages = 6; // Changed from 5 to 6 to utilize all API tokens
+                const numImages = 6; 
                 const responses = await huggingFaceService.generateMultipleImages(session.prompt, modelId, numImages);
                 
                 // Send all generated images as a media group
@@ -257,25 +257,52 @@ export function setupImageCommand(bot, rateLimit) {
                     parse_mode: 'Markdown'
                 }));
 
-                await bot.sendMediaGroup(chatId, mediaGroup, {
-                    reply_to_message_id: session.originalMessageId
-                });
+                try {
+                    await bot.sendMediaGroup(chatId, mediaGroup, {
+                        reply_to_message_id: session.originalMessageId
+                    });
+                } catch (sendError) {
+                    console.error('Error sending media group:', sendError);
+                    // Try to send a user-friendly error message
+                    try {
+                        await bot.editMessageText(
+                            '❌ Network error while sending images. Please try again.',
+                            {
+                                chat_id: chatId,
+                                message_id: statusMessageId,
+                                parse_mode: 'Markdown'
+                            }
+                        );
+                    } catch (finalError) {
+                        console.error('Could not send error message:', finalError);
+                    }
+                    return;
+                }
 
                 // Clear animation and delete the status message
                 clearInterval(animationInterval);
-                await bot.deleteMessage(chatId, statusMessageId);
+                try {
+                    await bot.deleteMessage(chatId, statusMessageId);
+                } catch (deleteError) {
+                    console.error('Error deleting status message:', deleteError);
+                }
 
             } catch (error) {
                 // Clear animation on error
                 clearInterval(animationInterval);
                 console.error('Error in image generation:', error);
-                await bot.editMessageText(
-                    '❌ An error occurred while generating the images. Please try again.',
-                    {
-                        chat_id: chatId,
-                        message_id: statusMessageId
-                    }
-                );
+                try {
+                    await bot.editMessageText(
+                        '❌ An error occurred while generating the images. Please try again.',
+                        {
+                            chat_id: chatId,
+                            message_id: statusMessageId,
+                            parse_mode: 'Markdown'
+                        }
+                    );
+                } catch (editError) {
+                    console.error('Could not edit error message:', editError);
+                }
             }
             return;
         }
