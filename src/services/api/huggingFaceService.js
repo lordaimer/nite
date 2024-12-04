@@ -57,8 +57,13 @@ class HuggingFaceService {
                 inputs: prompt,
                 model: model
             });
+            
+            // Convert Blob to Buffer
+            const arrayBuffer = await result.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            
             console.log(`✅ Successfully generated image for ${model}`);
-            return result;
+            return buffer;
         } catch (error) {
             if (retryCount < this.maxRetries) {
                 console.log(`⚠️ Retry ${retryCount + 1} for ${model}: ${error.message}`);

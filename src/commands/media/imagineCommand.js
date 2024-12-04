@@ -71,20 +71,6 @@ export function setupImageCommand(bot, rateLimit) {
         }]))
     });
 
-    // Modified helper function for image action buttons
-    const getImageActionButtons = (promptId) => ({
-        inline_keyboard: [[
-            {
-                text: '🎲 Regenerate',
-                callback_data: `reg_${promptId}`
-            },
-            {
-                text: '✨ Upscale',
-                callback_data: `upscale_${promptId}`
-            }
-        ]]
-    });
-
     // Handle bare command without prompt
     bot.onText(/\/(imagine|im|image)$/, async (msg) => {
         const chatId = msg.chat.id;
@@ -189,30 +175,96 @@ export function setupImageCommand(bot, rateLimit) {
             try {
                 const results = await generateVariety(session.prompt);
                 
-                // Send all generated images
-                for (const { modelName, image } of results) {
-                    const buffer = Buffer.from(await image.arrayBuffer());
-                    await bot.sendPhoto(chatId, buffer, {
-                        caption: `*${modelName}*`,
-                        parse_mode: 'Markdown',
-                        reply_to_message_id: session.originalMessageId,
-                        reply_markup: getImageActionButtons(session.promptId)
-                    });
-                }
+                // Send all generated images as a media group
+                const mediaGroup = results.map(({ modelName, image }) => ({
+                    type: 'photo',
+                    media: image, // Image is now already a Buffer
+                    caption: `*${modelName}*`,
+                    parse_mode: 'Markdown'
+                }));
 
-                // Delete the "Generating..." message
-                await bot.deleteMessage(chatId, messageId);
-            } catch (error) {
+                await bot.sendMediaGroup(chatId, mediaGroup, {
+                    reply_to_message_id: session.originalMessageId
+                });
+
                 await bot.editMessageText(
-                    '❌ Failed to generate variety of images. Please try again.',
+                    '✨ Generated images using all available models!',
+                    {
+                        chat_id: chatId,
+                        message_id: messageId
+                    }
+                );
+            } catch (error) {
+                console.error('Error in variety generation:', error);
+                await bot.editMessageText(
+                    '❌ An error occurred while generating images. Please try again.',
                     {
                         chat_id: chatId,
                         message_id: messageId
                     }
                 );
             }
+            await bot.answerCallbackQuery(query.id);
+            return;
+        }
 
-            userSessions.delete(chatId);
+        // Handle model selection
+        if (query.data.startsWith('generate_')) {
+            const modelName = query.data.replace('generate_', '');
+            const modelId = MODELS[modelName];
+            const session = userSessions.get(chatId);
+            
+            if (!session) {
+                await bot.answerCallbackQuery(query.id, {
+                    text: '❌ Session expired. Please start over with /imagine command.',
+                    show_alert: true
+                });
+                return;
+            }
+
+            await bot.editMessageText(
+                `🎨 Generating images using ${modelName}...`,
+                {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    reply_markup: { inline_keyboard: [] }
+                }
+            );
+
+            try {
+                // Generate multiple images from the same model
+                const numImages = 5;
+                const responses = await huggingFaceService.generateMultipleImages(session.prompt, modelId, numImages);
+                
+                // Send all generated images as a media group
+                const mediaGroup = responses.map(image => ({
+                    type: 'photo',
+                    media: image,
+                    caption: `*${modelName}*`,
+                    parse_mode: 'Markdown'
+                }));
+
+                await bot.sendMediaGroup(chatId, mediaGroup, {
+                    reply_to_message_id: session.originalMessageId
+                });
+
+                await bot.editMessageText(
+                    '✨ Generated images successfully!',
+                    {
+                        chat_id: chatId,
+                        message_id: messageId
+                    }
+                );
+            } catch (error) {
+                console.error('Error in image generation:', error);
+                await bot.editMessageText(
+                    '❌ An error occurred while generating the images. Please try again.',
+                    {
+                        chat_id: chatId,
+                        message_id: messageId
+                    }
+                );
+            }
             await bot.answerCallbackQuery(query.id);
             return;
         }
@@ -240,77 +292,6 @@ export function setupImageCommand(bot, rateLimit) {
                 });
             }
             return;
-        }
-
-        // Handle model selection
-        if (query.data.startsWith('generate_')) {
-            const modelName = query.data.replace('generate_', '');
-            const modelId = MODELS[modelName];
-            const session = userSessions.get(chatId);
-
-            if (!session) {
-                await bot.answerCallbackQuery(query.id, {
-                    text: '❌ Session expired. Please start over with /imagine command.',
-                    show_alert: true
-                });
-                return;
-            }
-
-            const prompt = session.prompt;
-
-            await bot.editMessageText(
-                '🎨 Generating images...',
-                {
-                    chat_id: chatId,
-                    message_id: messageId,
-                    reply_markup: { inline_keyboard: [] }
-                }
-            );
-
-            try {
-                // Generate multiple images from the same model
-                const numImages = 5;
-                const responses = await huggingFaceService.generateMultipleImages(prompt, modelId, numImages);
-
-                // Send all generated images
-                for (const response of responses) {
-                    const buffer = Buffer.from(await response.arrayBuffer());
-                    await bot.sendPhoto(chatId, buffer, {
-                        caption: `*${modelName}*`,
-                        parse_mode: 'Markdown',
-                        reply_to_message_id: session.originalMessageId,
-                        reply_markup: getImageActionButtons(session.promptId)
-                    });
-                }
-
-                // Delete the "Generating..." message
-                await bot.deleteMessage(chatId, messageId);
-            } catch (error) {
-                try {
-                    await bot.editMessageText(
-                        `❌ Failed to generate images using ${modelName}. Please try again.`,
-                        {
-                            chat_id: chatId,
-                            message_id: messageId
-                        }
-                    );
-                } catch (editError) {
-                    await bot.sendMessage(
-                        chatId,
-                        `❌ Failed to generate images using ${modelName}. Please try again.`,
-                        {
-                            reply_to_message_id: session.originalMessageId
-                        }
-                    );
-                }
-            }
-
-            userSessions.delete(chatId);
-            try {
-                await bot.answerCallbackQuery(query.id);
-            } catch (error) {
-                console.error(`Failed to answer callback query: ${error.message}`);
-            }
         }
 
         // Handle regenerate button
