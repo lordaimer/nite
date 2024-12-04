@@ -236,7 +236,7 @@ export function setupImageCommand(bot, rateLimit) {
 
             try {
                 // Generate multiple images from the same model
-                const numImages = 5;
+                const numImages = 6; // Changed from 5 to 6 to utilize all API tokens
                 const responses = await huggingFaceService.generateMultipleImages(session.prompt, modelId, numImages);
                 
                 // Send all generated images as a media group
