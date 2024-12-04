@@ -219,14 +219,30 @@ export function setupImageCommand(bot, rateLimit) {
             // Answer callback query immediately
             await bot.answerCallbackQuery(query.id);
 
-            await bot.editMessageText(
-                `🎨 Generating images using ${modelName}...`,
-                {
-                    chat_id: chatId,
-                    message_id: messageId,
-                    reply_markup: { inline_keyboard: [] }
-                }
-            );
+            // Send initial status message
+            const statusMessageId = (await bot.sendMessage(
+                chatId,
+                `*Generating images using ${modelName}* ◡`,
+                { parse_mode: 'Markdown' }
+            )).message_id;
+
+            // Delete the model selection message
+            await bot.deleteMessage(chatId, messageId);
+
+            // Setup animation frames
+            const frames = ['◜', '◝', '◞', '◟'];
+            let frameIndex = 0;
+            const animationInterval = setInterval(() => {
+                bot.editMessageText(
+                    `*Generating images using ${modelName}* ${frames[frameIndex]}`,
+                    {
+                        chat_id: chatId,
+                        message_id: statusMessageId,
+                        parse_mode: 'Markdown'
+                    }
+                ).catch(() => {});
+                frameIndex = (frameIndex + 1) % frames.length;
+            }, 150);
 
             try {
                 // Generate multiple images from the same model
@@ -245,14 +261,19 @@ export function setupImageCommand(bot, rateLimit) {
                     reply_to_message_id: session.originalMessageId
                 });
 
-                await bot.deleteMessage(chatId, messageId);
+                // Clear animation and delete the status message
+                clearInterval(animationInterval);
+                await bot.deleteMessage(chatId, statusMessageId);
+
             } catch (error) {
+                // Clear animation on error
+                clearInterval(animationInterval);
                 console.error('Error in image generation:', error);
                 await bot.editMessageText(
                     '❌ An error occurred while generating the images. Please try again.',
                     {
                         chat_id: chatId,
-                        message_id: messageId
+                        message_id: statusMessageId
                     }
                 );
             }
