@@ -7,7 +7,19 @@ const MODELS = {
     'FLUX Realism': 'XLabs-AI/flux-RealismLora',
     'FLUX Logo': 'Shakker-Labs/FLUX.1-dev-LoRA-Logo-Design',
     'FLUX Koda': 'alvdansen/flux-koda',
-    'Anime Style': 'alvdansen/softserve_anime'
+    'Anime Style': 'alvdansen/softserve_anime',
+    'Midjourney Style': 'Jovie/Midjourney',
+    'Super Realism': 'strangerzonehf/Flux-Super-Realism-LoRA',
+    'Midjourney Mix': 'strangerzonehf/Flux-Midjourney-Mix2-LoRA',
+    'Isometric 3D': 'strangerzonehf/Flux-Isometric-3D-LoRA',
+    '3D Garment': 'strangerzonehf/Flux-3D-Garment-Mannequin',
+    'Cute 3D': 'strangerzonehf/Flux-Cute-3D-Kawaii-LoRA',
+    '3D Portrait': 'prithivMLmods/Castor-3D-Portrait-Flux-LoRA',
+    '3D Render': 'prithivMLmods/3D-Render-Flux-LoRA',
+    'Live 3D': 'Shakker-Labs/FLUX.1-dev-LoRA-live-3D',
+    'Red Light': 'Shakker-Labs/SD3.5-LoRA-Linear-Red-Light',
+    'Goofy 3D': 'goofyai/3D_Render_for_Flux',
+    'Vector Art': 'renderartist/simplevectorflux'
 };
 
 const generateImage = async (modelId, prompt) => {
@@ -64,12 +76,42 @@ export function setupImageCommand(bot, rateLimit) {
     });
 
     // Helper function to create model selection keyboard
-    const getModelKeyboard = () => ({
-        inline_keyboard: Object.keys(MODELS).map(name => ([{
+    const getModelKeyboard = (page = 0) => {
+        const modelsPerPage = 5;
+        const modelNames = Object.keys(MODELS);
+        const totalPages = Math.ceil(modelNames.length / modelsPerPage);
+        const startIdx = page * modelsPerPage;
+        const endIdx = Math.min(startIdx + modelsPerPage, modelNames.length);
+        const currentPageModels = modelNames.slice(startIdx, endIdx);
+
+        const keyboard = currentPageModels.map(name => ([{
             text: name,
             callback_data: `generate_${name}`
-        }]))
-    });
+        }]));
+
+        // Add navigation buttons
+        const navRow = [];
+        if (page > 0) {
+            navRow.push({
+                text: '⬅️ Previous',
+                callback_data: `page_${page - 1}`
+            });
+        }
+        if (page < totalPages - 1) {
+            navRow.push({
+                text: 'Next ➡️',
+                callback_data: `page_${page + 1}`
+            });
+        }
+
+        if (navRow.length > 0) {
+            keyboard.push(navRow);
+        }
+
+        return {
+            inline_keyboard: keyboard
+        };
+    };
 
     // Handle bare command without prompt
     bot.onText(/\/(imagine|im|image)$/, async (msg) => {
@@ -145,7 +187,7 @@ export function setupImageCommand(bot, rateLimit) {
                 {
                     chat_id: chatId,
                     message_id: messageId,
-                    reply_markup: getModelKeyboard()
+                    reply_markup: getModelKeyboard(0)
                 }
             );
             await bot.answerCallbackQuery(query.id);
@@ -166,45 +208,12 @@ export function setupImageCommand(bot, rateLimit) {
             // Send initial status message
             const statusMessageId = (await bot.sendMessage(
                 chatId,
-                '*Generating variety of images* ◡',
+                '*Generating variety of images*',
                 { parse_mode: 'Markdown' }
             )).message_id;
 
             // Delete the model selection message
             await bot.deleteMessage(chatId, messageId);
-
-            // Setup animation frames with longer interval to avoid rate limits
-            const frames = ['◜', '◝', '◞', '◟'];
-            let frameIndex = 0;
-            let lastUpdateTime = Date.now();
-            const MIN_UPDATE_INTERVAL = 500; // Minimum 2 seconds between updates
-            
-            const animationInterval = setInterval(async () => {
-                const now = Date.now();
-                // Only update if enough time has passed
-                if (now - lastUpdateTime >= MIN_UPDATE_INTERVAL) {
-                    try {
-                        await bot.editMessageText(
-                            `*Generating variety of images* ${frames[frameIndex]}`,
-                            {
-                                chat_id: chatId,
-                                message_id: statusMessageId,
-                                parse_mode: 'Markdown'
-                            }
-                        );
-                        lastUpdateTime = now;
-                        frameIndex = (frameIndex + 1) % frames.length;
-                    } catch (error) {
-                        if (error.code === 'ETELEGRAM' && error.response.statusCode === 429) {
-                            const retryAfter = error.response.body.parameters.retry_after || 30;
-                            console.log(`Rate limited, waiting ${retryAfter} seconds before next update`);
-                            // Skip this update and wait for the next interval
-                        } else {
-                            console.error('Error updating status message:', error);
-                        }
-                    }
-                }
-            }, 2000); // Check every 2 seconds
 
             try {
                 // List of all models with their display names
@@ -214,7 +223,19 @@ export function setupImageCommand(bot, rateLimit) {
                     'XLabs-AI/flux-RealismLora': 'FLUX Realism',
                     'Shakker-Labs/FLUX.1-dev-LoRA-Logo-Design': 'FLUX Logo',
                     'alvdansen/flux-koda': 'FLUX Koda',
-                    'alvdansen/softserve_anime': 'Anime Style'
+                    'alvdansen/softserve_anime': 'Anime Style',
+                    'Jovie/Midjourney': 'Midjourney Style',
+                    'strangerzonehf/Flux-Super-Realism-LoRA': 'Super Realism',
+                    'strangerzonehf/Flux-Midjourney-Mix2-LoRA': 'Midjourney Mix',
+                    'strangerzonehf/Flux-Isometric-3D-LoRA': 'Isometric 3D',
+                    'strangerzonehf/Flux-3D-Garment-Mannequin': '3D Garment',
+                    'strangerzonehf/Flux-Cute-3D-Kawaii-LoRA': 'Cute 3D',
+                    'prithivMLmods/Castor-3D-Portrait-Flux-LoRA': '3D Portrait',
+                    'prithivMLmods/3D-Render-Flux-LoRA': '3D Render',
+                    'Shakker-Labs/FLUX.1-dev-LoRA-live-3D': 'Live 3D',
+                    'Shakker-Labs/SD3.5-LoRA-Linear-Red-Light': 'Red Light',
+                    'goofyai/3D_Render_for_Flux': 'Goofy 3D',
+                    'renderartist/simplevectorflux': 'Vector Art'
                 };
 
                 // Add a unique timestamp to prevent server-side caching
@@ -235,62 +256,52 @@ export function setupImageCommand(bot, rateLimit) {
                         parse_mode: 'Markdown'
                     }));
 
-                    // Clear animation before sending images
-                    clearInterval(animationInterval);
-
                     try {
                         await bot.sendMediaGroup(chatId, mediaGroup, {
                             reply_to_message_id: session.originalMessageId
                         });
                     } catch (sendError) {
-                        if (sendError.code === 'ETELEGRAM' && sendError.response.statusCode === 429) {
-                            const retryAfter = sendError.response.body.parameters.retry_after || 30;
-                            console.log(`Rate limited when sending images, waiting ${retryAfter} seconds`);
-                            await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
-                            // Try sending again after waiting
-                            await bot.sendMediaGroup(chatId, mediaGroup, {
-                                reply_to_message_id: session.originalMessageId
-                            });
-                        } else {
-                            console.error('Error sending media group:', sendError);
-                            try {
-                                await bot.editMessageText(
-                                    '❌ Network error while sending images. Please try again.',
-                                    {
-                                        chat_id: chatId,
-                                        message_id: statusMessageId,
-                                        parse_mode: 'Markdown'
-                                    }
-                                );
-                            } catch (finalError) {
-                                console.error('Could not send error message:', finalError);
-                            }
-                            return;
+                        console.error('Error sending media group:', sendError);
+                        // Try to send a user-friendly error message
+                        try {
+                            await bot.editMessageText(
+                                '❌ Network error while sending images. Please try again.',
+                                {
+                                    chat_id: chatId,
+                                    message_id: statusMessageId,
+                                    parse_mode: 'Markdown'
+                                }
+                            );
+                        } catch (finalError) {
+                            console.error('Could not send error message:', finalError);
                         }
+                        return;
                     }
 
-                    // Try to delete status message after sending images
+                    // Delete the status message
                     try {
                         await bot.deleteMessage(chatId, statusMessageId);
                     } catch (deleteError) {
                         console.error('Error deleting status message:', deleteError);
                     }
+
                 } else {
                     throw new Error('No images were generated successfully');
                 }
 
             } catch (error) {
-                // Clear animation on error
-                clearInterval(animationInterval);
+                // Delete the status message
+                try {
+                    await bot.deleteMessage(chatId, statusMessageId);
+                } catch (deleteError) {
+                    console.error('Error deleting status message:', deleteError);
+                }
                 console.error('Error in image generation:', error);
                 try {
-                    await bot.editMessageText(
+                    await bot.sendMessage(
+                        chatId,
                         '❌ An error occurred while generating the images. Please try again.',
-                        {
-                            chat_id: chatId,
-                            message_id: statusMessageId,
-                            parse_mode: 'Markdown'
-                        }
+                        { parse_mode: 'Markdown' }
                     );
                 } catch (editError) {
                     console.error('Could not edit error message:', editError);
@@ -319,27 +330,12 @@ export function setupImageCommand(bot, rateLimit) {
             // Send initial status message
             const statusMessageId = (await bot.sendMessage(
                 chatId,
-                `*Generating images using ${modelName}* ◡`,
+                `🎨 Generating images using ${modelName}...`,
                 { parse_mode: 'Markdown' }
             )).message_id;
 
             // Delete the model selection message
             await bot.deleteMessage(chatId, messageId);
-
-            // Setup animation frames
-            const frames = ['◜', '◝', '◞', '◟'];
-            let frameIndex = 0;
-            const animationInterval = setInterval(() => {
-                bot.editMessageText(
-                    `*Generating images using ${modelName}* ${frames[frameIndex]}`,
-                    {
-                        chat_id: chatId,
-                        message_id: statusMessageId,
-                        parse_mode: 'Markdown'
-                    }
-                ).catch(() => {});
-                frameIndex = (frameIndex + 1) % frames.length;
-            }, 150);
 
             try {
                 // Generate multiple images from the same model
@@ -376,8 +372,7 @@ export function setupImageCommand(bot, rateLimit) {
                     return;
                 }
 
-                // Clear animation and delete the status message
-                clearInterval(animationInterval);
+                // Delete the status message
                 try {
                     await bot.deleteMessage(chatId, statusMessageId);
                 } catch (deleteError) {
@@ -385,22 +380,38 @@ export function setupImageCommand(bot, rateLimit) {
                 }
 
             } catch (error) {
-                // Clear animation on error
-                clearInterval(animationInterval);
+                // Delete the status message
+                try {
+                    await bot.deleteMessage(chatId, statusMessageId);
+                } catch (deleteError) {
+                    console.error('Error deleting status message:', deleteError);
+                }
                 console.error('Error in image generation:', error);
                 try {
-                    await bot.editMessageText(
+                    await bot.sendMessage(
+                        chatId,
                         '❌ An error occurred while generating the images. Please try again.',
-                        {
-                            chat_id: chatId,
-                            message_id: statusMessageId,
-                            parse_mode: 'Markdown'
-                        }
+                        { parse_mode: 'Markdown' }
                     );
                 } catch (editError) {
                     console.error('Could not edit error message:', editError);
                 }
             }
+            return;
+        }
+
+        // Handle page navigation
+        if (query.data.startsWith('page_')) {
+            const page = parseInt(query.data.replace('page_', ''));
+            await bot.editMessageText(
+                'Choose a model for image generation:',
+                {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    reply_markup: getModelKeyboard(page)
+                }
+            );
+            await bot.answerCallbackQuery(query.id);
             return;
         }
 
