@@ -243,7 +243,9 @@ export function setupImageCommand(bot, rateLimit) {
                     }));
 
                     // Send all successfully generated images
-                    await bot.sendMediaGroup(chatId, mediaGroup);
+                    await bot.sendMediaGroup(chatId, mediaGroup, {
+                        reply_to_message_id: session.originalMessageId
+                    });
                     
                     // Update final status
                     await bot.editMessageText(
@@ -313,7 +315,9 @@ export function setupImageCommand(bot, rateLimit) {
                     parse_mode: 'Markdown'
                 }));
 
-                await bot.sendMediaGroup(chatId, mediaGroup);
+                await bot.sendMediaGroup(chatId, mediaGroup, {
+                    reply_to_message_id: session.originalMessageId
+                });
 
                 // Delete the status message after images are sent
                 await bot.deleteMessage(chatId, statusMessageId);
