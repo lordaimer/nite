@@ -205,16 +205,19 @@ export function setupImageCommand(bot, rateLimit) {
                 return;
             }
 
-            // Get primary models for variety mode
+            // Get primary models for variety mode with their display names
             const primaryModels = [
-                'black-forest-labs/FLUX.1-dev',
-                'black-forest-labs/FLUX.1-schnell',
-                'XLabs-AI/flux-RealismLora',
-                'Shakker-Labs/FLUX.1-dev-LoRA-Logo-Design',
-                'alvdansen/flux-koda',
-                'alvdansen/softserve_anime',
-                'Jovie/Midjourney'
+                { id: 'black-forest-labs/FLUX.1-dev', name: 'FLUX Dev' },
+                { id: 'black-forest-labs/FLUX.1-schnell', name: 'FLUX Schnell' },
+                { id: 'XLabs-AI/flux-RealismLora', name: 'FLUX Realism' },
+                { id: 'Shakker-Labs/FLUX.1-dev-LoRA-Logo-Design', name: 'FLUX Logo' },
+                { id: 'alvdansen/flux-koda', name: 'FLUX Koda' },
+                { id: 'alvdansen/softserve_anime', name: 'Anime Style' },
+                { id: 'Jovie/Midjourney', name: 'Midjourney Style' }
             ];
+
+            // Delete the model selection message
+            await bot.deleteMessage(chatId, messageId);
 
             // Send initial status message
             const statusMessageId = (await bot.sendMessage(
@@ -224,14 +227,17 @@ export function setupImageCommand(bot, rateLimit) {
             )).message_id;
 
             try {
-                const { results, errors } = await huggingFaceService.batchGenerateImages(session.prompt, primaryModels);
+                const { results, errors } = await huggingFaceService.batchGenerateImages(
+                    session.prompt, 
+                    primaryModels.map(m => m.id)
+                );
 
                 if (results.length > 0) {
                     // Create media group from successful generations
                     const mediaGroup = results.map(({ model, image }) => ({
                         type: 'photo',
                         media: image,
-                        caption: `*${MODELS[model]}*`,
+                        caption: `*${primaryModels.find(m => m.id === model)?.name || model}*`,
                         parse_mode: 'Markdown'
                     }));
 
