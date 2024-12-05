@@ -205,54 +205,28 @@ export function setupImageCommand(bot, rateLimit) {
                 return;
             }
 
+            // Get all available models
+            const allModels = Object.keys(MODELS);
+            
+            // In variety mode, only use the first 7 models due to API key limitations
+            const selectedModels = allModels.slice(0, 7);
+
             // Send initial status message
             const statusMessageId = (await bot.sendMessage(
                 chatId,
-                '*Generating variety of images*',
+                '*Generating variety of images...*\nNote: Limited to 7 models due to API key availability.',
                 { parse_mode: 'Markdown' }
             )).message_id;
 
-            // Delete the model selection message
-            await bot.deleteMessage(chatId, messageId);
-
             try {
-                // List of all models with their display names
-                const modelMap = {
-                    'black-forest-labs/FLUX.1-dev': 'FLUX Dev',
-                    'black-forest-labs/FLUX.1-schnell': 'FLUX Schnell',
-                    'XLabs-AI/flux-RealismLora': 'FLUX Realism',
-                    'Shakker-Labs/FLUX.1-dev-LoRA-Logo-Design': 'FLUX Logo',
-                    'alvdansen/flux-koda': 'FLUX Koda',
-                    'alvdansen/softserve_anime': 'Anime Style',
-                    'Jovie/Midjourney': 'Midjourney Style',
-                    'strangerzonehf/Flux-Super-Realism-LoRA': 'Super Realism',
-                    'strangerzonehf/Flux-Midjourney-Mix2-LoRA': 'Midjourney Mix',
-                    'strangerzonehf/Flux-Isometric-3D-LoRA': 'Isometric 3D',
-                    'strangerzonehf/Flux-3D-Garment-Mannequin': '3D Garment',
-                    'strangerzonehf/Flux-Cute-3D-Kawaii-LoRA': 'Cute 3D',
-                    'prithivMLmods/Castor-3D-Portrait-Flux-LoRA': '3D Portrait',
-                    'prithivMLmods/3D-Render-Flux-LoRA': '3D Render',
-                    'Shakker-Labs/FLUX.1-dev-LoRA-live-3D': 'Live 3D',
-                    'Shakker-Labs/SD3.5-LoRA-Linear-Red-Light': 'Red Light',
-                    'goofyai/3D_Render_for_Flux': 'Goofy 3D',
-                    'renderartist/simplevectorflux': 'Vector Art'
-                };
-
-                // Add a unique timestamp to prevent server-side caching
-                const uniquePrompt = `${session.prompt} [t:${Date.now()}]`;
-                
-                // Generate images using all models
-                const { results, errors } = await huggingFaceService.batchGenerateImages(
-                    uniquePrompt,
-                    Object.keys(modelMap)
-                );
+                const { results, errors } = await huggingFaceService.batchGenerateImages(session.prompt, selectedModels);
 
                 if (results.length > 0) {
                     // Create media group from successful generations
                     const mediaGroup = results.map(({ model, image }) => ({
                         type: 'photo',
                         media: image,
-                        caption: `*${modelMap[model]}*`,
+                        caption: `*${MODELS[model]}*`,
                         parse_mode: 'Markdown'
                     }));
 
@@ -327,16 +301,6 @@ export function setupImageCommand(bot, rateLimit) {
             // Answer callback query immediately
             await bot.answerCallbackQuery(query.id);
 
-            // Send initial status message
-            const statusMessageId = (await bot.sendMessage(
-                chatId,
-                `🎨 Generating images using ${modelName}...`,
-                { parse_mode: 'Markdown' }
-            )).message_id;
-
-            // Delete the model selection message
-            await bot.deleteMessage(chatId, messageId);
-
             try {
                 // Generate multiple images from the same model
                 const numImages = 6; 
@@ -356,15 +320,11 @@ export function setupImageCommand(bot, rateLimit) {
                     });
                 } catch (sendError) {
                     console.error('Error sending media group:', sendError);
-                    // Try to send a user-friendly error message
                     try {
-                        await bot.editMessageText(
+                        await bot.sendMessage(
+                            chatId,
                             '❌ Network error while sending images. Please try again.',
-                            {
-                                chat_id: chatId,
-                                message_id: statusMessageId,
-                                parse_mode: 'Markdown'
-                            }
+                            { parse_mode: 'Markdown' }
                         );
                     } catch (finalError) {
                         console.error('Could not send error message:', finalError);
@@ -372,20 +332,7 @@ export function setupImageCommand(bot, rateLimit) {
                     return;
                 }
 
-                // Delete the status message
-                try {
-                    await bot.deleteMessage(chatId, statusMessageId);
-                } catch (deleteError) {
-                    console.error('Error deleting status message:', deleteError);
-                }
-
             } catch (error) {
-                // Delete the status message
-                try {
-                    await bot.deleteMessage(chatId, statusMessageId);
-                } catch (deleteError) {
-                    console.error('Error deleting status message:', deleteError);
-                }
                 console.error('Error in image generation:', error);
                 try {
                     await bot.sendMessage(

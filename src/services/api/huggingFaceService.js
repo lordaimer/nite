@@ -1,13 +1,31 @@
 import { HfInference } from '@huggingface/inference';
 import { config } from '../../config/env.config.js';
 
+// TODO: Need 11 more API keys to support all 18 models in variety mode
+// Currently have 7 keys, so variety mode is limited to 7 models at a time
+
 const MODEL_TOKEN_MAP = {
+    // Primary models - These will be used for variety mode since we have limited API keys
     'black-forest-labs/FLUX.1-dev': 0,        // FLUX Dev - Token 1
     'black-forest-labs/FLUX.1-schnell': 1,    // FLUX Schnell - Token 2
     'XLabs-AI/flux-RealismLora': 2,          // FLUX Realism - Token 3
     'Shakker-Labs/FLUX.1-dev-LoRA-Logo-Design': 3, // FLUX Logo - Token 4
     'alvdansen/flux-koda': 4,                 // FLUX Koda - Token 5
-    'alvdansen/softserve_anime': 5            // Anime Style - Token 6
+    'alvdansen/softserve_anime': 5,           // Anime Style - Token 6
+    'Jovie/Midjourney': 6,                    // Midjourney Style - Token 7
+
+    // Secondary models - These will only be available in single model mode until we get more API keys
+    'strangerzonehf/Flux-Super-Realism-LoRA': 0,  // Super Realism
+    'strangerzonehf/Flux-Midjourney-Mix2-LoRA': 1, // Midjourney Mix
+    'strangerzonehf/Flux-Isometric-3D-LoRA': 2,   // Isometric 3D
+    'strangerzonehf/Flux-3D-Garment-Mannequin': 3, // 3D Garment
+    'strangerzonehf/Flux-Cute-3D-Kawaii-LoRA': 4, // Cute 3D
+    'prithivMLmods/Castor-3D-Portrait-Flux-LoRA': 5, // 3D Portrait
+    'prithivMLmods/3D-Render-Flux-LoRA': 6,      // 3D Render
+    'Shakker-Labs/FLUX.1-dev-LoRA-live-3D': 0,   // Live 3D
+    'Shakker-Labs/SD3.5-LoRA-Linear-Red-Light': 1, // Red Light
+    'goofyai/3D_Render_for_Flux': 2,            // Goofy 3D
+    'renderartist/simplevectorflux': 3           // Vector Art
 };
 
 class HuggingFaceService {
@@ -142,12 +160,9 @@ class HuggingFaceService {
         const promises = models.map(async (model) => {
             try {
                 const result = await this.generateImage(prompt, model);
-                const modelName = Object.entries(MODEL_TOKEN_MAP).find(([key, value]) => key === model)[0];
-                console.log(`✨ Added ${modelName} result to batch`);
                 results.push({ model, image: result });
             } catch (error) {
-                const modelName = Object.entries(MODEL_TOKEN_MAP).find(([key, value]) => key === model)[0];
-                console.error(`❌ Failed to generate image for ${modelName}:`, error.message);
+                console.error(`❌ Failed to generate image for ${model}:`, error.message);
                 errors.push({ model, error: error.message });
             }
         });
