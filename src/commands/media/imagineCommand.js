@@ -97,13 +97,13 @@ export function setupImageCommand(bot, rateLimit) {
         const navRow = [];
         if (page > 0) {
             navRow.push({
-                text: '⬅️ Previous',
+                text: '<< Previous',
                 callback_data: `page_${page - 1}`
             });
         }
         if (page < totalPages - 1) {
             navRow.push({
-                text: 'Next ➡️',
+                text: 'Next >>',
                 callback_data: `page_${page + 1}`
             });
         }
