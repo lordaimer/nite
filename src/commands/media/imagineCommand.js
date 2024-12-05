@@ -228,7 +228,8 @@ export function setupImageCommand(bot, rateLimit) {
 
             try {
                 const { results, errors } = await huggingFaceService.batchGenerateImages(
-                    session.prompt, 
+                    // Add unique identifier to base prompt for variety mode
+                    `${session.prompt} [variety:${Date.now()}]`, 
                     primaryModels.map(m => m.id)
                 );
 

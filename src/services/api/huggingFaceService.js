@@ -72,9 +72,15 @@ class HuggingFaceService {
         
         try {
             this.activeGenerations.set(token, true);
+            // Add unique timestamp and random string to prevent duplicates
+            const uniquePrompt = `${prompt} [t:${Date.now()}:${Math.random().toString(36).substr(2, 9)}]`;
+            
             const result = await client.textToImage({
-                inputs: prompt,
-                model: model
+                inputs: uniquePrompt,
+                model: model,
+                parameters: {
+                    negative_prompt: "blurry, bad quality, worst quality, low quality, deformed, distorted, disfigured"
+                }
             });
             
             // Convert Blob to Buffer
@@ -160,10 +166,12 @@ class HuggingFaceService {
         const errors = [];
         console.log(`🚀 Starting batch generation for ${models.length} models`);
 
-        // Create a promise for each model generation
-        const modelPromises = models.map(async (model) => {
+        // Create a promise for each model generation with unique timestamp
+        const modelPromises = models.map(async (model, index) => {
+            // Add unique timestamp for each model to prevent duplicates
+            const uniquePrompt = `${prompt} [t:${Date.now() + index}]`;
             try {
-                const result = await this.generateImage(prompt, model);
+                const result = await this.generateImage(uniquePrompt, model);
                 results.push({ model, image: result });
             } catch (error) {
                 console.error(`❌ Failed to generate image for ${model}:`, error.message);
