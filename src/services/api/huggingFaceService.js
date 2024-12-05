@@ -72,15 +72,12 @@ class HuggingFaceService {
         
         try {
             this.activeGenerations.set(token, true);
-            // Add unique timestamp and random string to prevent duplicates
+            // Add unique timestamp to prevent duplicates
             const uniquePrompt = `${prompt} [t:${Date.now()}:${Math.random().toString(36).substr(2, 9)}]`;
             
             const result = await client.textToImage({
                 inputs: uniquePrompt,
-                model: model,
-                parameters: {
-                    negative_prompt: "blurry, bad quality, worst quality, low quality, deformed, distorted, disfigured"
-                }
+                model: model
             });
             
             // Convert Blob to Buffer
