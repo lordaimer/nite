@@ -313,23 +313,10 @@ export function setupImageCommand(bot, rateLimit) {
                     parse_mode: 'Markdown'
                 }));
 
-                try {
-                    await bot.sendMediaGroup(chatId, mediaGroup, {
-                        reply_to_message_id: session.originalMessageId
-                    });
-                } catch (sendError) {
-                    console.error('Error sending media group:', sendError);
-                    try {
-                        await bot.sendMessage(
-                            chatId,
-                            '❌ Network error while sending images. Please try again.',
-                            { parse_mode: 'Markdown' }
-                        );
-                    } catch (finalError) {
-                        console.error('Could not send error message:', finalError);
-                    }
-                    return;
-                }
+                await bot.sendMediaGroup(chatId, mediaGroup);
+
+                // Delete the status message after images are sent
+                await bot.deleteMessage(chatId, statusMessageId);
 
             } catch (error) {
                 console.error('Error in image generation:', error);
