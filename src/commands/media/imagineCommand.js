@@ -1,4 +1,5 @@
 import huggingFaceService from '../../services/api/huggingFaceService.js';
+import modelUsageService from '../../services/modelUsage/modelUsageService.js';
 import { addToUpscaleQueue } from './upscaleCommand.js';
 
 const MODELS = {
@@ -76,13 +77,16 @@ export function setupImageCommand(bot, rateLimit) {
     });
 
     // Helper function to create model selection keyboard
-    const getModelKeyboard = (page = 0) => {
+    const getModelKeyboard = (userId, page = 0) => {
         const modelsPerPage = 5;
         const modelNames = Object.keys(MODELS);
-        const totalPages = Math.ceil(modelNames.length / modelsPerPage);
+        
+        // Get sorted models based on user's usage
+        const sortedModels = modelUsageService.getUserTopModels(userId, modelNames);
+        const totalPages = Math.ceil(sortedModels.length / modelsPerPage);
         const startIdx = page * modelsPerPage;
-        const endIdx = Math.min(startIdx + modelsPerPage, modelNames.length);
-        const currentPageModels = modelNames.slice(startIdx, endIdx);
+        const endIdx = Math.min(startIdx + modelsPerPage, sortedModels.length);
+        const currentPageModels = sortedModels.slice(startIdx, endIdx);
 
         const keyboard = currentPageModels.map(name => ([{
             text: name,
@@ -178,24 +182,43 @@ export function setupImageCommand(bot, rateLimit) {
 
     bot.on('callback_query', async (query) => {
         const chatId = query.message.chat.id;
+        const userId = query.from.id;
         const messageId = query.message.message_id;
+        const data = query.data;
 
-        // Handle mode selection
-        if (query.data === 'mode_select') {
-            await bot.editMessageText(
-                'Choose a model for image generation:',
-                {
-                    chat_id: chatId,
-                    message_id: messageId,
-                    reply_markup: getModelKeyboard(0)
-                }
-            );
+        // Get user session
+        const session = userSessions.get(userId);
+        if (!session) {
+            await bot.answerCallbackQuery(query.id, {
+                text: '❌ Session expired. Please start a new /imagine command.',
+                show_alert: true
+            });
+            return;
+        }
+
+        if (data === 'mode_select') {
+            // Show model selection keyboard
+            await bot.editMessageText('🎨 Choose a model:', {
+                chat_id: chatId,
+                message_id: messageId,
+                reply_markup: getModelKeyboard(userId)
+            });
             await bot.answerCallbackQuery(query.id);
             return;
         }
 
-        // Handle variety mode
-        if (query.data === 'mode_variety') {
+        if (data.startsWith('page_')) {
+            const page = parseInt(data.split('_')[1]);
+            await bot.editMessageText('🎨 Choose a model:', {
+                chat_id: chatId,
+                message_id: messageId,
+                reply_markup: getModelKeyboard(userId, page)
+            });
+            await bot.answerCallbackQuery(query.id);
+            return;
+        }
+
+        if (data === 'mode_variety') {
             const session = userSessions.get(chatId);
             if (!session) {
                 await bot.answerCallbackQuery(query.id, {
@@ -278,19 +301,14 @@ export function setupImageCommand(bot, rateLimit) {
         }
 
         // Handle model selection
-        if (query.data.startsWith('generate_')) {
-            const modelName = query.data.replace('generate_', '');
+        if (data.startsWith('generate_')) {
+            const modelName = data.substring('generate_'.length);
             const modelId = MODELS[modelName];
-            const session = userSessions.get(chatId);
             
-            if (!session) {
-                await bot.answerCallbackQuery(query.id, {
-                    text: '❌ Session expired. Please start over with /imagine command.',
-                    show_alert: true
-                });
-                return;
-            }
+            // Track model usage when selected
+            modelUsageService.trackModelUsage(userId, modelName);
 
+            // Single model mode
             // Answer callback query immediately
             await bot.answerCallbackQuery(query.id);
 
@@ -337,23 +355,8 @@ export function setupImageCommand(bot, rateLimit) {
             return;
         }
 
-        // Handle page navigation
-        if (query.data.startsWith('page_')) {
-            const page = parseInt(query.data.replace('page_', ''));
-            await bot.editMessageText(
-                'Choose a model for image generation:',
-                {
-                    chat_id: chatId,
-                    message_id: messageId,
-                    reply_markup: getModelKeyboard(page)
-                }
-            );
-            await bot.answerCallbackQuery(query.id);
-            return;
-        }
-
         // Handle upscale button
-        if (query.data.startsWith('upscale_')) {
+        if (data.startsWith('upscale_')) {
             const photo = query.message.photo;
             if (!photo) {
                 await bot.answerCallbackQuery(query.id, {
@@ -378,8 +381,8 @@ export function setupImageCommand(bot, rateLimit) {
         }
 
         // Handle regenerate button
-        if (query.data.startsWith('reg_')) {
-            const promptId = query.data.replace('reg_', '');
+        if (data.startsWith('reg_')) {
+            const promptId = data.replace('reg_', '');
             const promptData = promptCache.get(promptId);
             
             if (!promptData) {
