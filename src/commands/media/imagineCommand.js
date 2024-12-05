@@ -292,13 +292,21 @@ export function setupImageCommand(bot, rateLimit) {
             // Answer callback query immediately
             await bot.answerCallbackQuery(query.id);
 
+            // Delete the model selection message
+            await bot.deleteMessage(chatId, messageId);
+
+            // Send status message
+            const statusMessageId = (await bot.sendMessage(
+                chatId,
+                `*Generating images using ${modelName}...*`,
+                { parse_mode: 'Markdown' }
+            )).message_id;
+
             try {
-                // Generate multiple images from the same model
-                const numImages = 6; 
-                const responses = await huggingFaceService.generateMultipleImages(session.prompt, modelId, numImages);
+                const images = await huggingFaceService.generateMultipleImages(session.prompt, modelId, 6);
                 
                 // Send all generated images as a media group
-                const mediaGroup = responses.map(image => ({
+                const mediaGroup = images.map(image => ({
                     type: 'photo',
                     media: image,
                     caption: `*${modelName}*`,
