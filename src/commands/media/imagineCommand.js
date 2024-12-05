@@ -205,11 +205,16 @@ export function setupImageCommand(bot, rateLimit) {
                 return;
             }
 
-            // Get all available models
-            const allModels = Object.keys(MODELS);
-            
-            // In variety mode, only use the first 7 models due to API key limitations
-            const selectedModels = allModels.slice(0, 7);
+            // Get primary models for variety mode
+            const primaryModels = [
+                'black-forest-labs/FLUX.1-dev',
+                'black-forest-labs/FLUX.1-schnell',
+                'XLabs-AI/flux-RealismLora',
+                'Shakker-Labs/FLUX.1-dev-LoRA-Logo-Design',
+                'alvdansen/flux-koda',
+                'alvdansen/softserve_anime',
+                'Jovie/Midjourney'
+            ];
 
             // Send initial status message
             const statusMessageId = (await bot.sendMessage(
@@ -219,7 +224,7 @@ export function setupImageCommand(bot, rateLimit) {
             )).message_id;
 
             try {
-                const { results, errors } = await huggingFaceService.batchGenerateImages(session.prompt, selectedModels);
+                const { results, errors } = await huggingFaceService.batchGenerateImages(session.prompt, primaryModels);
 
                 if (results.length > 0) {
                     // Create media group from successful generations

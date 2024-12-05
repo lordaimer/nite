@@ -67,7 +67,8 @@ class HuggingFaceService {
     }
 
     async generateImageWithRetry(client, token, prompt, model, retryCount = 0) {
-        console.log(`🎨 Starting generation for ${model} using token ${this.tokens.indexOf(token) + 1}`);
+        const tokenIndex = this.tokens.indexOf(token);
+        console.log(`🎨 Starting generation for ${model} using token ${tokenIndex + 1}`);
         
         try {
             this.activeGenerations.set(token, true);
@@ -96,6 +97,9 @@ class HuggingFaceService {
 
     async generateImage(prompt, model, forceRotate = false) {
         const { client, token, index } = this.getClientForModel(model, forceRotate);
+        if (!client || !token) {
+            throw new Error(`No valid client or token found for model ${model}`);
+        }
         try {
             const result = await this.generateImageWithRetry(client, token, prompt, model);
             return result;
