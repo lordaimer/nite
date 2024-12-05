@@ -160,8 +160,8 @@ class HuggingFaceService {
         const errors = [];
         console.log(`🚀 Starting batch generation for ${models.length} models`);
 
-        // Generate images in parallel, each model using its dedicated token
-        const promises = models.map(async (model) => {
+        // Create a promise for each model generation
+        const modelPromises = models.map(async (model) => {
             try {
                 const result = await this.generateImage(prompt, model);
                 results.push({ model, image: result });
@@ -171,13 +171,31 @@ class HuggingFaceService {
             }
         });
 
-        await Promise.all(promises);
+        // Create a timeout promise
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => {
+                reject(new Error('TIMEOUT'));
+            }, this.GLOBAL_TIMEOUT);
+        });
+
+        try {
+            // Race between all model generations and the timeout
+            await Promise.race([
+                Promise.all(modelPromises),
+                timeoutPromise
+            ]);
+        } catch (error) {
+            if (error.message === 'TIMEOUT') {
+                console.log(`⏰ Global timeout reached after ${this.GLOBAL_TIMEOUT / 1000} seconds`);
+                // Don't throw error, just continue with whatever results we have
+            }
+        }
+
         console.log(`🏁 Batch generation completed. Success: ${results.length}, Failures: ${errors.length}`);
         
-        // If all models failed, throw an error
-        if (results.length === 0 && errors.length === models.length) {
-            console.error('❌ All models failed to generate images');
-            throw new Error('All models failed to generate images. Please try again.');
+        // Return results even if incomplete due to timeout
+        if (results.length === 0) {
+            throw new Error('No images were generated. Please try again.');
         }
 
         return { results, errors };

@@ -222,7 +222,7 @@ export function setupImageCommand(bot, rateLimit) {
             // Send initial status message
             const statusMessageId = (await bot.sendMessage(
                 chatId,
-                '*Generating variety of images...*\nNote: Limited to 7 models due to API key availability.',
+                '*Generating variety of images...*\nNote: Limited to 7 models, timeout after 5 minutes.\nAny successfully generated images will be sent.',
                 { parse_mode: 'Markdown' }
             )).message_id;
 
@@ -241,35 +241,14 @@ export function setupImageCommand(bot, rateLimit) {
                         parse_mode: 'Markdown'
                     }));
 
-                    try {
-                        await bot.sendMediaGroup(chatId, mediaGroup, {
-                            reply_to_message_id: session.originalMessageId
-                        });
-                    } catch (sendError) {
-                        console.error('Error sending media group:', sendError);
-                        // Try to send a user-friendly error message
-                        try {
-                            await bot.editMessageText(
-                                '❌ Network error while sending images. Please try again.',
-                                {
-                                    chat_id: chatId,
-                                    message_id: statusMessageId,
-                                    parse_mode: 'Markdown'
-                                }
-                            );
-                        } catch (finalError) {
-                            console.error('Could not send error message:', finalError);
-                        }
-                        return;
-                    }
-
-                    // Delete the status message
-                    try {
-                        await bot.deleteMessage(chatId, statusMessageId);
-                    } catch (deleteError) {
-                        console.error('Error deleting status message:', deleteError);
-                    }
-
+                    // Send all successfully generated images
+                    await bot.sendMediaGroup(chatId, mediaGroup);
+                    
+                    // Update final status
+                    await bot.editMessageText(
+                        `✅ Generated ${results.length} out of ${primaryModels.length} images`,
+                        { chat_id: chatId, message_id: statusMessageId }
+                    );
                 } else {
                     throw new Error('No images were generated successfully');
                 }
