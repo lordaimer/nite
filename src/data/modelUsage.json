@@ -1,0 +1,102 @@
+{
+  "users": {
+    "5880729554": {
+      "models": {
+        "FLUX Dev": {
+          "count": 0,
+          "lastUsed": null
+        },
+        "FLUX Schnell": {
+          "count": 9,
+          "lastUsed": "2024-12-05T08:39:39.220Z"
+        },
+        "FLUX Realism": {
+          "count": 0,
+          "lastUsed": null
+        },
+        "FLUX Logo": {
+          "count": 0,
+          "lastUsed": null
+        },
+        "FLUX Koda": {
+          "count": 0,
+          "lastUsed": null
+        },
+        "Anime Style": {
+          "count": 0,
+          "lastUsed": null
+        },
+        "Midjourney Style": {
+          "count": 0,
+          "lastUsed": null
+        },
+        "Super Realism": {
+          "count": 1,
+          "lastUsed": "2024-12-05T06:49:24.778Z"
+        },
+        "Midjourney Mix": {
+          "count": 1,
+          "lastUsed": "2024-12-05T08:15:29.417Z"
+        },
+        "Isometric 3D": {
+          "count": 0,
+          "lastUsed": null
+        },
+        "3D Garment": {
+          "count": 0,
+          "lastUsed": null
+        },
+        "Cute 3D": {
+          "count": 0,
+          "lastUsed": null
+        },
+        "3D Portrait": {
+          "count": 0,
+          "lastUsed": null
+        },
+        "3D Render": {
+          "count": 0,
+          "lastUsed": null
+        },
+        "Live 3D": {
+          "count": 8,
+          "lastUsed": "2024-12-05T09:51:53.536Z"
+        },
+        "Red Light": {
+          "count": 0,
+          "lastUsed": null
+        },
+        "Goofy 3D": {
+          "count": 0,
+          "lastUsed": null
+        },
+        "Vector Art": {
+          "count": 0,
+          "lastUsed": null
+        }
+      },
+      "totalGenerations": 19
+    }
+  },
+  "global": {
+    "models": {
+      "Live 3D": {
+        "count": 8,
+        "lastUsed": "2024-12-05T09:51:53.536Z"
+      },
+      "Super Realism": {
+        "count": 1,
+        "lastUsed": "2024-12-05T06:49:24.778Z"
+      },
+      "FLUX Schnell": {
+        "count": 9,
+        "lastUsed": "2024-12-05T08:39:39.220Z"
+      },
+      "Midjourney Mix": {
+        "count": 1,
+        "lastUsed": "2024-12-05T08:15:29.417Z"
+      }
+    },
+    "totalGenerations": 19
+  }
+}
